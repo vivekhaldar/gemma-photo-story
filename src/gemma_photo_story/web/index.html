@@ -347,15 +347,37 @@
     }
 
     .photo-frame {
+      position: relative;
+      display: grid;
       aspect-ratio: 4 / 5;
       overflow: hidden;
       background: oklch(84% 0.025 74);
+      place-items: center;
     }
 
     .photo-frame img {
       width: 100%;
       height: 100%;
       object-fit: cover;
+    }
+
+    .preview-status {
+      position: absolute;
+      inset: auto 0 0;
+      padding: 0.65rem;
+      background: var(--ink);
+      color: var(--paper);
+      font-size: 0.75rem;
+      font-weight: 700;
+      opacity: 0;
+      text-align: center;
+      transform: translateY(100%);
+      transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+    }
+
+    .photo-frame.is-preparing .preview-status {
+      opacity: 1;
+      transform: translateY(0);
     }
 
     .photo-label {
@@ -757,7 +779,18 @@
 
   <script>
     const SUPPORTED = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif", "tif", "tiff"]);
-    const state = { files: [], objectUrls: [], sessionId: null, story: "", model: "gemma4:26b", polling: false };
+    const state = {
+      files: [],
+      objectUrls: [],
+      sessionId: null,
+      story: "",
+      model: "gemma4:26b",
+      polling: false,
+      uploadedFiles: new Map(),
+      previewUrls: new Map(),
+      syncPromise: Promise.resolve(),
+      selectionVersion: 0
+    };
     const $ = (selector) => document.querySelector(selector);
 
     const elements = {
@@ -806,6 +839,10 @@
         hideError();
       }
       renderPhotos();
+      if (additions.length) {
+        state.selectionVersion += 1;
+        queueSelectionSync();
+      }
     }
 
     function clearObjectUrls() {
@@ -821,14 +858,28 @@
         item.className = "photo-tile";
         item.style.setProperty("--delay", `${Math.min(index, 8) * 45}ms`);
         const frame = document.createElement("div");
-        frame.className = "photo-frame";
+        frame.className = "photo-frame is-preparing";
         const image = document.createElement("img");
-        const url = URL.createObjectURL(file);
-        state.objectUrls.push(url);
-        image.src = url;
+        const key = fileKey(file);
+        const serverPreview = state.previewUrls.get(key);
         image.alt = `Selected photograph ${index + 1}: ${file.name}`;
         image.loading = "lazy";
-        frame.append(image);
+        image.addEventListener("load", () => frame.classList.remove("is-preparing"));
+        image.addEventListener("error", () => {
+          image.hidden = true;
+          frame.classList.add("is-preparing");
+        });
+        if (serverPreview) {
+          image.src = serverPreview;
+        } else {
+          const url = URL.createObjectURL(file);
+          state.objectUrls.push(url);
+          image.src = url;
+        }
+        const previewStatus = document.createElement("span");
+        previewStatus.className = "preview-status";
+        previewStatus.textContent = "Preparing local preview…";
+        frame.append(image, previewStatus);
         const label = document.createElement("p");
         label.className = "photo-label";
         label.textContent = file.name;
@@ -839,6 +890,46 @@
       elements.photoCount.textContent = `${count} ${count === 1 ? "photograph" : "photographs"}`;
       elements.contactSheet.classList.toggle("is-visible", count > 0);
       elements.createStory.disabled = count === 0;
+    }
+
+    function queueSelectionSync() {
+      const version = state.selectionVersion;
+      state.syncPromise = state.syncPromise
+        .catch(() => undefined)
+        .then(() => syncSelectionToLocalApp(version));
+      state.syncPromise.catch((error) => {
+        if (version !== state.selectionVersion) return;
+        elements.createStory.disabled = true;
+        showError(`A local thumbnail could not be prepared. ${error.message} Clear the selection and try again.`);
+      });
+    }
+
+    async function syncSelectionToLocalApp(version) {
+      if (version !== state.selectionVersion || !state.files.length) return;
+      if (!state.sessionId) {
+        const session = await fetchJson("/api/sessions", { method: "POST" });
+        if (version !== state.selectionVersion) return;
+        state.sessionId = session.id;
+      }
+      for (const file of state.files) {
+        if (version !== state.selectionVersion) return;
+        const key = fileKey(file);
+        if (state.uploadedFiles.has(key)) continue;
+        const uploaded = await fetchJson(
+          `/api/sessions/${state.sessionId}/files?name=${encodeURIComponent(file.name)}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/octet-stream" },
+            body: file
+          }
+        );
+        const stillSelected = state.files.some((candidate) => fileKey(candidate) === key);
+        if (!stillSelected) return;
+        state.uploadedFiles.set(key, uploaded.file_name);
+        state.previewUrls.set(key, uploaded.preview_url);
+        renderPhotos();
+        if (version !== state.selectionVersion) return;
+      }
     }
 
     async function readEntry(entry, files) {
@@ -897,21 +988,15 @@
       elements.createStory.disabled = true;
       elements.progressPanel.classList.add("is-visible");
       elements.storySection.classList.remove("is-visible");
-      setProgress(0.03, "Creating a private local workspace…");
+      setProgress(0.03, "Finishing local photo preparation…");
       elements.progressPanel.scrollIntoView({ behavior: "smooth", block: "start" });
       try {
-        const session = await fetchJson("/api/sessions", { method: "POST" });
-        state.sessionId = session.id;
-        history.replaceState(null, "", `?session=${state.sessionId}`);
-        for (let index = 0; index < state.files.length; index += 1) {
-          const file = state.files[index];
-          setProgress(0.05 + ((index + 1) / state.files.length) * 0.15, `Passing photograph ${index + 1} of ${state.files.length} to the local app…`);
-          await fetchJson(`/api/sessions/${state.sessionId}/files?name=${encodeURIComponent(file.name)}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/octet-stream" },
-            body: file
-          });
+        await state.syncPromise;
+        if (!state.sessionId || state.uploadedFiles.size !== state.files.length) {
+          throw new Error("The local photo preparation did not finish.");
         }
+        history.replaceState(null, "", `?session=${state.sessionId}`);
+        setProgress(0.2, "Reading timestamps and GPS metadata locally…");
         await fetchJson(`/api/sessions/${state.sessionId}/process`, { method: "POST" });
         state.polling = true;
         await pollSession();
@@ -1057,9 +1142,13 @@
 
     function resetApp() {
       state.polling = false;
+      state.selectionVersion += 1;
       state.files = [];
       state.sessionId = null;
       state.story = "";
+      state.uploadedFiles.clear();
+      state.previewUrls.clear();
+      state.syncPromise = Promise.resolve();
       renderPhotos();
       elements.progressPanel.classList.remove("is-visible");
       elements.storySection.classList.remove("is-visible");
@@ -1104,9 +1193,15 @@
     });
     $("#choosePhotos").addEventListener("click", (event) => { event.stopPropagation(); elements.photoInput.click(); });
     $("#chooseFolder").addEventListener("click", (event) => { event.stopPropagation(); elements.folderInput.click(); });
-    elements.photoInput.addEventListener("change", (event) => addFiles(event.target.files));
-    elements.folderInput.addEventListener("change", (event) => addFiles(event.target.files));
-    $("#clearPhotos").addEventListener("click", () => { state.files = []; renderPhotos(); });
+    elements.photoInput.addEventListener("change", (event) => {
+      addFiles(event.target.files);
+      event.target.value = "";
+    });
+    elements.folderInput.addEventListener("change", (event) => {
+      addFiles(event.target.files);
+      event.target.value = "";
+    });
+    $("#clearPhotos").addEventListener("click", resetApp);
     elements.createStory.addEventListener("click", createStory);
     $("#copyStory").addEventListener("click", copyStory);
     $("#saveStory").addEventListener("click", saveStory);

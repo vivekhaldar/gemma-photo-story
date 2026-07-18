@@ -1,3 +1,4 @@
+import base64
 import json
 import tempfile
 import threading
@@ -6,13 +7,18 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from gemma_photo_story.cli import StoryError
+from gemma_photo_story.cli import StoryError, run_checked
 from gemma_photo_story.web import (
     INDEX_PATH,
     create_server,
     is_allowed_host_header,
     is_allowed_origin,
     sanitize_upload_name,
+)
+
+
+TINY_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
 )
 
 
@@ -48,6 +54,7 @@ class StaticPageTests(unittest.TestCase):
         self.assertIn('id="dropZone"', page)
         self.assertIn('id="storyContent"', page)
         self.assertIn("webkitdirectory", page)
+        self.assertIn("Preparing local preview", page)
         self.assertNotIn("<script src=", page)
         self.assertNotIn("<link rel=\"stylesheet\"", page)
         self.assertNotIn("https://", page)
@@ -102,14 +109,57 @@ class LoopbackServerTests(unittest.TestCase):
         status, session = self.request_json("/api/sessions", method="POST", data=b"")
         self.assertEqual(status, 201)
         status, uploaded = self.request_json(
-            f"/api/sessions/{session['id']}/files?name=IMG_0001.jpg",
+            f"/api/sessions/{session['id']}/files?name=IMG_0001.png",
             method="PUT",
-            data=b"real local bytes",
+            data=TINY_PNG,
         )
         self.assertEqual(status, 201)
-        self.assertEqual(uploaded["file_name"], "IMG_0001.jpg")
+        self.assertEqual(uploaded["file_name"], "IMG_0001.png")
+        self.assertTrue(uploaded["preview_url"].endswith("IMG_0001.png.preview.jpg"))
+        with self.opener.open(f"{self.origin}{uploaded['preview_url']}", timeout=2) as response:
+            preview = response.read()
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.headers["Content-Type"], "image/jpeg")
+            self.assertEqual(preview[:2], b"\xff\xd8")
         _, snapshot = self.request_json(f"/api/sessions/{session['id']}")
         self.assertEqual(snapshot["file_count"], 1)
+
+    def test_rejects_invalid_image_bytes_without_retaining_file(self) -> None:
+        _, session = self.request_json("/api/sessions", method="POST", data=b"")
+        request = urllib.request.Request(
+            f"{self.origin}/api/sessions/{session['id']}/files?name=broken.HEIC",
+            data=b"not an image",
+            method="PUT",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as context:
+            self.opener.open(request, timeout=2)
+        response = context.exception
+        try:
+            self.assertEqual(response.code, 400)
+            error = json.loads(response.read().decode("utf-8"))
+            self.assertIn("Could not prepare a local preview", error["error"])
+        finally:
+            response.close()
+        _, snapshot = self.request_json(f"/api/sessions/{session['id']}")
+        self.assertEqual(snapshot["file_count"], 0)
+
+    def test_generates_jpeg_preview_for_heic_upload(self) -> None:
+        source = Path(self.temporary_directory.name) / "source.png"
+        heic = Path(self.temporary_directory.name) / "source.heic"
+        source.write_bytes(TINY_PNG)
+        run_checked(
+            ["sips", "-s", "format", "heic", str(source), "--out", str(heic)]
+        )
+        _, session = self.request_json("/api/sessions", method="POST", data=b"")
+        status, uploaded = self.request_json(
+            f"/api/sessions/{session['id']}/files?name=vacation.HEIC",
+            method="PUT",
+            data=heic.read_bytes(),
+        )
+        self.assertEqual(status, 201)
+        with self.opener.open(f"{self.origin}{uploaded['preview_url']}", timeout=2) as response:
+            self.assertEqual(response.headers["Content-Type"], "image/jpeg")
+            self.assertEqual(response.read(2), b"\xff\xd8")
 
     def test_rejects_processing_an_empty_session(self) -> None:
         _, session = self.request_json("/api/sessions", method="POST", data=b"")

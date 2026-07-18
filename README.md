@@ -44,8 +44,10 @@ uv run gemma-photo-story-web
 ```
 
 Then drag a folder or a set of photos onto the page. The app shows local
-progress, the resolved place and Gemma description for each image, and the
-finished narrative with copy and Markdown-download controls.
+JPEG thumbnails generated locally with `sips` (including for HEIC originals),
+local progress, the resolved place and Gemma description for each image, and
+the finished narrative with copy and Markdown-download controls. Each original
+is transferred to the loopback server once and reused for Gemma analysis.
 
 Normal browser security does not reveal absolute paths for dropped files. The
 page therefore transfers the selected bytes to the Python server over

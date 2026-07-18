@@ -19,6 +19,7 @@ from .cli import (
     IMAGE_EXTENSIONS,
     StoryError,
     check_prerequisites,
+    prepare_jpeg,
     run,
 )
 
@@ -88,6 +89,10 @@ class SessionState:
     def output_dir(self) -> Path:
         return self.root / "output"
 
+    @property
+    def previews_dir(self) -> Path:
+        return self.root / "previews"
+
     def add_log(self, message: str) -> None:
         with self.lock:
             self.logs.append(message)
@@ -140,6 +145,7 @@ class StoryHTTPServer(ThreadingHTTPServer):
         identifier = uuid.uuid4().hex
         root = self.workspace / identifier
         (root / "photos").mkdir(parents=True)
+        (root / "previews").mkdir()
         session = SessionState(identifier, root, self.model)
         with self.sessions_lock:
             self.sessions[identifier] = session
@@ -218,6 +224,28 @@ class StoryRequestHandler(BaseHTTPRequestHandler):
             )
             return
         segments = self._segments(route.path)
+        if (
+            len(segments) == 5
+            and segments[:2] == ["api", "sessions"]
+            and segments[3] == "previews"
+        ):
+            session = self.server.get_session(segments[2])
+            if session is None:
+                self._send_error(HTTPStatus.NOT_FOUND, "Photo session not found")
+                return
+            preview_name = urllib.parse.unquote(segments[4])
+            if (
+                Path(preview_name).name != preview_name
+                or not preview_name.endswith(".preview.jpg")
+            ):
+                self._send_error(HTTPStatus.NOT_FOUND, "Photo preview not found")
+                return
+            preview_path = session.previews_dir / preview_name
+            if not preview_path.is_file():
+                self._send_error(HTTPStatus.NOT_FOUND, "Photo preview not found")
+                return
+            self._send_binary(preview_path.read_bytes(), "image/jpeg")
+            return
         if len(segments) == 3 and segments[:2] == ["api", "sessions"]:
             session = self.server.get_session(segments[2])
             if session is None:
@@ -301,8 +329,27 @@ class StoryRequestHandler(BaseHTTPRequestHandler):
                 return
             target = self._unique_target(session.photos_dir, file_name)
             target.write_bytes(content)
+            preview_name = f"{target.name}.preview.jpg"
+            preview_path = session.previews_dir / preview_name
+            try:
+                prepare_jpeg(target, preview_path, 640)
+            except StoryError as exc:
+                target.unlink(missing_ok=True)
+                preview_path.unlink(missing_ok=True)
+                self._send_error(
+                    HTTPStatus.BAD_REQUEST,
+                    f"Could not prepare a local preview for {target.name}: {exc}",
+                )
+                return
         self._send_json(
-            {"file_name": target.name, "bytes": content_length},
+            {
+                "file_name": target.name,
+                "bytes": content_length,
+                "preview_url": (
+                    f"/api/sessions/{session.identifier}/previews/"
+                    f"{urllib.parse.quote(preview_name, safe='')}"
+                ),
+            },
             status=HTTPStatus.CREATED,
         )
 
@@ -356,6 +403,12 @@ class StoryRequestHandler(BaseHTTPRequestHandler):
     def _send_html(self, content: bytes) -> None:
         self.send_response(HTTPStatus.OK)
         self._security_headers("text/html; charset=utf-8", len(content))
+        self.end_headers()
+        self.wfile.write(content)
+
+    def _send_binary(self, content: bytes, content_type: str) -> None:
+        self.send_response(HTTPStatus.OK)
+        self._security_headers(content_type, len(content))
         self.end_headers()
         self.wfile.write(content)
 
