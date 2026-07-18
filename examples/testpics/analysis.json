@@ -1,0 +1,283 @@
+[
+  {
+    "metadata": {
+      "file_name": "IMG_6323.HEIC",
+      "source_path": "/Users/haldar/Downloads/testpics/IMG_6323.HEIC",
+      "captured_at": "2026:06:20 17:04:20",
+      "latitude": 34.0629166666667,
+      "longitude": -118.358230555556,
+      "altitude_meters": 63.22186959
+    },
+    "place": {
+      "city": "Los Angeles",
+      "country": "United States",
+      "county": "Los Angeles County",
+      "district": "Mid-Wilshire",
+      "housenumber": "5905",
+      "label": "Iris and B. Gerald Cantor Sculpture Garden, 5905, Wilshire Boulevard, Mid-Wilshire, Los Angeles, Los Angeles County, California, 90036, United States",
+      "name": "Iris and B. Gerald Cantor Sculpture Garden",
+      "postcode": "90036",
+      "source": "OpenStreetMap Nominatim",
+      "state": "California",
+      "street": "Wilshire Boulevard",
+      "type": "house",
+      "named_place": {
+        "name": "Los Angeles County Museum of Art",
+        "label": "Los Angeles County Museum of Art, 5905, Wilshire Boulevard, Mid-Wilshire, Los Angeles, Los Angeles County, California, 90036, United States",
+        "type": "house",
+        "distance_meters": 112.0
+      },
+      "lookup_complete": true
+    },
+    "visual": {
+      "concise_description": "A photograph of people viewing two anthropoid sarcophagi displayed against a deep blue wall in an indoor museum setting.",
+      "subjects": [
+        "two anthropoid sarcophagi",
+        "museum visitors",
+        "display case",
+        "blue wall"
+      ],
+      "setting": "An indoor museum gallery with dark blue walls and controlled lighting.",
+      "mood": "Quiet and contemplative, characterized by low-key lighting and focused activity.",
+      "story_details": [
+        "Two brightly painted Egyptian-style sarcophagi featuring blue headdresses and intricate gold/yellow patterns.",
+        "A group of visitors standing before a glass display case on the left.",
+        "Deep blue textured wall serving as the backdrop for the artifacts.",
+        "The lighting is focused on the artifacts, leaving much of the surrounding area in shadow."
+      ],
+      "readable_text": [],
+      "landmark_hypotheses": [
+        {
+          "name": "Los Angeles County Museum of Art (LACMA)",
+          "confidence": 0.8,
+          "evidence": "The reverse-geocoded metadata places the image at the Iris and B. Gerald Cantor Sculpture Garden, which is part of the LACMA campus; the indoor museum setting with Egyptian artifacts is consistent with a major art museum."
+        }
+      ],
+      "uncertainty": "It cannot be determined from the pixels alone if the sarcophagi are authentic ancient Egyptian artifacts or modern reproductions/replicas. The specific identity of the artworks is not legible on the objects themselves."
+    }
+  },
+  {
+    "metadata": {
+      "file_name": "IMG_6348.HEIC",
+      "source_path": "/Users/haldar/Downloads/testpics/IMG_6348.HEIC",
+      "captured_at": "2026:06:20 17:23:37",
+      "latitude": 34.0624972222222,
+      "longitude": -118.356802777778,
+      "altitude_meters": 63.87186962
+    },
+    "place": {
+      "city": "Los Angeles",
+      "country": "United States",
+      "county": "Los Angeles County",
+      "district": "Mid-Wilshire",
+      "housenumber": "5848",
+      "label": "5848, Wilshire Boulevard, Miracle Mile, Mid-Wilshire, Los Angeles, Los Angeles County, California, 90036, United States",
+      "locality": "Miracle Mile",
+      "postcode": "90036",
+      "source": "OpenStreetMap Nominatim",
+      "state": "California",
+      "street": "Wilshire Boulevard",
+      "type": "house",
+      "lookup_complete": true
+    },
+    "visual": {
+      "concise_description": "A photograph of an impressionist oil painting of water lilies, displayed in a thick gold frame on a dark reddish-brown wall.",
+      "subjects": [
+        "oil painting",
+        "water lilies",
+        "gold frame",
+        "museum plaque",
+        "textured wall"
+      ],
+      "setting": "An indoor gallery or museum setting with a dark, textured wall.",
+      "mood": "Serene and contemplative due to the soft pastel colors of the painting and the dim, focused lighting.",
+      "story_details": [
+        "The painting features visible brushstrokes in shades of blue, lavender, green, and white.",
+        "A small black identification plaque is mounted to the left of the frame.",
+        "The gold frame has a wide, tiered profile.",
+        "The signature 'Claude Monet' is visible in the bottom right corner of the canvas."
+      ],
+      "readable_text": [
+        "Claude Monet"
+      ],
+      "landmark_hypotheses": [
+        {
+          "name": "Claude Monet Water Lilies",
+          "confidence": 0.9,
+          "evidence": "The visible signature 'Claude Monet' and the distinct impressionist style depicting water lilies."
+        },
+        {
+          "name": "Los Angeles Museum/Gallery",
+          "confidence": 0.5,
+          "evidence": "The presence of a framed artwork with an identification plaque on a gallery-style wall, combined with reverse-geocoded metadata placing the photo in Los Angeles."
+        }
+      ],
+      "uncertainty": "The specific name of the museum or gallery cannot be determined from the image. The text on the small black plaque is too small to be legible."
+    }
+  },
+  {
+    "metadata": {
+      "file_name": "IMG_6355.HEIC",
+      "source_path": "/Users/haldar/Downloads/testpics/IMG_6355.HEIC",
+      "captured_at": "2026:06:20 17:27:34",
+      "latitude": 34.0624166666667,
+      "longitude": -118.357413888889,
+      "altitude_meters": 63.87186962
+    },
+    "place": {
+      "city": "Los Angeles",
+      "country": "United States",
+      "county": "Los Angeles County",
+      "district": "Mid-Wilshire",
+      "label": "Wilshire Boulevard, Mid-Wilshire, Los Angeles, Los Angeles County, California, 90036, United States",
+      "name": "Wilshire Boulevard",
+      "postcode": "90036",
+      "source": "OpenStreetMap Nominatim",
+      "state": "California",
+      "type": "street",
+      "lookup_complete": true
+    },
+    "visual": {
+      "concise_description": "An outdoor view of a large, plant-covered sculpture situated in a plaza near a white building topped with a red 'VERY LACMA' sign.",
+      "subjects": [
+        "large plant-covered sculpture",
+        "white cylindrical building",
+        "red billboard",
+        "palm trees",
+        "modern high-rise buildings",
+        "people walking in a plaza",
+        "street with cars"
+      ],
+      "setting": "An urban plaza in Los Angeles, California, featuring modern architecture and greenery.",
+      "mood": "Bright and sunny with a calm, midday atmosphere.",
+      "story_details": [
+        "A massive sculpture covered in various types of succulents and moss",
+        "A large red sign reading 'VERY LACMA' atop a white structure",
+        "Tall palm trees scattered throughout the plaza and streetscape",
+        "People congregating near the base of the plant sculpture"
+      ],
+      "readable_text": [
+        "VERY LACMA"
+      ],
+      "landmark_hypotheses": [
+        {
+          "name": "LACMA (Los Angeles County Museum of Art)",
+          "confidence": 0.9,
+          "evidence": "The large red sign explicitly says 'VERY LACMA', and the reverse-geocoded metadata places the image in the Mid-Wilshire district of Los Angeles, where LACMA is located."
+        },
+        {
+          "name": "Patty Chang's 'Untitled' (or similar plant sculpture)",
+          "confidence": 0.5,
+          "evidence": "A large, prominent sculpture covered in living plants is a central feature of the image, though its specific title cannot be confirmed from pixels alone."
+        }
+      ],
+      "uncertainty": "The exact identity and name of the plant-covered sculpture are not explicitly stated in the visible text."
+    }
+  },
+  {
+    "metadata": {
+      "file_name": "IMG_6379.HEIC",
+      "source_path": "/Users/haldar/Downloads/testpics/IMG_6379.HEIC",
+      "captured_at": "2026:06:20 20:17:54",
+      "latitude": 34.3852777777778,
+      "longitude": -119.499655555556,
+      "altitude_meters": 23.05092749
+    },
+    "place": {
+      "city": "Carpinteria",
+      "country": "United States",
+      "county": "Santa Barbara County",
+      "label": "Rhodes-Fleming Coastal Trail, Carpinteria, Santa Barbara County, California, 93013, United States",
+      "name": "Rhodes-Fleming Coastal Trail",
+      "postcode": "93013",
+      "source": "OpenStreetMap Nominatim",
+      "state": "California",
+      "type": "street",
+      "lookup_complete": true
+    },
+    "visual": {
+      "concise_description": "A high-angle view of a sandy coastline at dusk, featuring gentle waves lapping against the shore and dark rocks scattered near the water's edge.",
+      "subjects": [
+        "ocean",
+        "sandy beach",
+        "coastal cliffs/vegetation",
+        "rocks in surf",
+        "distant ships",
+        "twilight sky"
+      ],
+      "setting": "A coastal landscape overlooking the Pacific Ocean during twilight, likely along a coastal trail.",
+      "mood": "Serene and tranquil, characterized by soft pastel colors in the sky and calm, rhythmic waves.",
+      "story_details": [
+        "The sky transitions from a pale blue to a soft pink hue at the horizon.",
+        "Dark, rocky outcrops are visible partially submerged in the shallow surf.",
+        "Dense green coastal scrub and dry brush line the foreground cliffside.",
+        "Two small, dark silhouettes of vessels are visible on the distant horizon."
+      ],
+      "readable_text": [],
+      "landmark_hypotheses": [
+        {
+          "name": "Rhodes-Fleming Coastal Trail",
+          "confidence": 0.6,
+          "evidence": "The metadata places the image at this specific trail in Carpinteria, California; the visual of a coastal overlook is consistent with this location."
+        }
+      ],
+      "uncertainty": "The exact point of vantage within the Rhodes-Fleming Coastal Trail cannot be confirmed from pixels alone. The identity of the distant vessels is indistinguishable."
+    }
+  },
+  {
+    "metadata": {
+      "file_name": "IMG_6403.HEIC",
+      "source_path": "/Users/haldar/Downloads/testpics/IMG_6403.HEIC",
+      "captured_at": "2026:06:21 13:26:14",
+      "latitude": 34.4243138888889,
+      "longitude": -119.702513888889,
+      "altitude_meters": 30.79041483
+    },
+    "place": {
+      "city": "Santa Barbara",
+      "country": "United States",
+      "county": "Santa Barbara County",
+      "housenumber": "1100",
+      "label": "1100, Anacapa Street, Santa Barbara, Santa Barbara County, California, 93121, United States",
+      "postcode": "93121",
+      "source": "OpenStreetMap Nominatim",
+      "state": "California",
+      "street": "Anacapa Street",
+      "type": "house",
+      "named_place": {
+        "name": "Santa Barbara County Courthouse",
+        "label": "Santa Barbara County Courthouse, 1100, Anacapa Street, Santa Barbara, Santa Barbara County, California, 93121, United States",
+        "type": "house",
+        "distance_meters": 1.4
+      },
+      "lookup_complete": true
+    },
+    "visual": {
+      "concise_description": "An upward-angled shot of an ornate, coffered wooden ceiling featuring intricate carvings and a hanging lantern, adjacent to a white wall with a framed painting.",
+      "subjects": [
+        "ornate wooden ceiling",
+        "hanging lantern",
+        "framed painting",
+        "white interior wall",
+        "decorative wall tiling/mosaics"
+      ],
+      "setting": "An interior space featuring Spanish Colonial Revival or Mediterranean-style architectural elements.",
+      "mood": "Warm and atmospheric, created by the low-angle lighting from the lantern and the earthy tones of the wood and masonry.",
+      "story_details": [
+        "Intricate geometric carvings on a dark wood ceiling panel",
+        "A multi-faceted hanging lantern casting warm light",
+        "A large framed painting depicting what appears to be a figure in classical or historical attire",
+        "Decorative mosaic patterns along the edge of the ceiling structure"
+      ],
+      "readable_text": [],
+      "landmark_hypotheses": [
+        {
+          "name": "Santa Barbara County Courthouse",
+          "confidence": 0.4,
+          "evidence": "The architectural style (ornate wood, mosaic, Mediterranean influence) is consistent with the Spanish Colonial Revival style of this landmark, and metadata places the image in close proximity to it."
+        }
+      ],
+      "uncertainty": "The exact identity of the figure in the painting cannot be determined due to lighting and distance. The specific building name cannot be confirmed from visual evidence alone."
+    }
+  }
+]
