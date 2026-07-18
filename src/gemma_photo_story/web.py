@@ -30,6 +30,7 @@ MAX_FILE_BYTES = 100 * 1024 * 1024
 MAX_PROCESS_BODY_BYTES = 2 * 1024 * 1024
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 INDEX_PATH = Path(__file__).with_name("web").joinpath("index.html")
+FAVICON_PATH = Path(__file__).with_name("web").joinpath("favicon.svg")
 
 
 def is_allowed_host_header(value: str | None) -> bool:
@@ -279,9 +280,11 @@ class StoryRequestHandler(BaseHTTPRequestHandler):
         if route.path == "/":
             self._send_html(INDEX_PATH.read_bytes())
             return
-        if route.path == "/favicon.ico":
-            self.send_response(HTTPStatus.NO_CONTENT)
-            self.end_headers()
+        if route.path in {"/favicon.svg", "/favicon.ico"}:
+            self._send_binary(
+                FAVICON_PATH.read_bytes(),
+                "image/svg+xml; charset=utf-8",
+            )
             return
         if route.path == "/api/config":
             self._send_json(

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from gemma_photo_story.cli import StoryError, run_checked
 from gemma_photo_story.web import (
+    FAVICON_PATH,
     INDEX_PATH,
     create_server,
     is_allowed_host_header,
@@ -78,6 +79,8 @@ class StaticPageTests(unittest.TestCase):
         page = INDEX_PATH.read_text(encoding="utf-8")
         self.assertIn('id="dropZone"', page)
         self.assertIn('id="storyContent"', page)
+        self.assertIn('href="/favicon.svg"', page)
+        self.assertIn("<svg", FAVICON_PATH.read_text(encoding="utf-8"))
         self.assertIn("webkitdirectory", page)
         self.assertIn("Preparing local preview", page)
         self.assertIn("localStorage", page)
@@ -132,6 +135,19 @@ class LoopbackServerTests(unittest.TestCase):
             self.assertIn("default-src 'self'", response.headers["Content-Security-Policy"])
             self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
             self.assertIn("Gemma Photo Story", page)
+
+    def test_serves_svg_favicon_and_legacy_fallback(self) -> None:
+        for path in ("/favicon.svg", "/favicon.ico"):
+            with self.subTest(path=path), self.opener.open(
+                f"{self.origin}{path}", timeout=2
+            ) as response:
+                icon = response.read().decode("utf-8")
+                self.assertEqual(response.status, 200)
+                self.assertEqual(
+                    response.headers["Content-Type"],
+                    "image/svg+xml; charset=utf-8",
+                )
+                self.assertIn("<svg", icon)
 
     def test_creates_session_and_accepts_local_photo_bytes(self) -> None:
         status, session = self.request_json("/api/sessions", method="POST", data=b"")
