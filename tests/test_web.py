@@ -242,10 +242,10 @@ class LoopbackServerTests(unittest.TestCase):
             [
                 "exiftool",
                 "-overwrite_original",
-                "-GPSLatitude=33.6175",
+                "-GPSLatitude=20.0",
                 "-GPSLatitudeRef=N",
-                "-GPSLongitude=117.9298",
-                "-GPSLongitudeRef=W",
+                "-GPSLongitude=10.0",
+                "-GPSLongitudeRef=E",
                 str(jpeg),
             ]
         )
@@ -255,7 +255,7 @@ class LoopbackServerTests(unittest.TestCase):
             method="PUT",
             data=jpeg.read_bytes(),
         )
-        cached_place = {"city": "Newport Beach", "label": "Newport Beach, California"}
+        cached_place = {"city": "Example City", "label": "Example City"}
         cached_visual = {
             "concise_description": "Sunlight falls across a coastal scene.",
             "subjects": ["coast"],

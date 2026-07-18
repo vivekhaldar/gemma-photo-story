@@ -127,7 +127,7 @@ class ParsingTests(unittest.TestCase):
         result = {
             "features": [
                 {
-                    "geometry": {"coordinates": [-119.7021, 34.4240]},
+                    "geometry": {"coordinates": [10.0001, 20.0001]},
                     "properties": {
                         "geocoding": {
                             "name": "Historic Courthouse",
@@ -137,7 +137,7 @@ class ParsingTests(unittest.TestCase):
                     },
                 },
                 {
-                    "geometry": {"coordinates": [-120.0, 35.0]},
+                    "geometry": {"coordinates": [11.0, 21.0]},
                     "properties": {
                         "geocoding": {
                             "name": "Distant Place",
@@ -148,16 +148,16 @@ class ParsingTests(unittest.TestCase):
                 },
             ]
         }
-        selected = select_named_candidate(result, 34.4241, -119.7022)
+        selected = select_named_candidate(result, 20.0, 10.0)
         self.assertIsNotNone(selected)
         self.assertEqual(selected["name"], "Historic Courthouse")
         self.assertLess(selected["distance_meters"], 20)
 
     def test_distance_and_photo_area(self) -> None:
-        self.assertLess(haversine_meters(34.0, -118.0, 34.0001, -118.0001), 20)
-        first = PhotoMetadata("a.jpg", "/a.jpg", None, 34.0, -118.0, None)
-        near = PhotoMetadata("b.jpg", "/b.jpg", None, 34.001, -118.001, None)
-        far = PhotoMetadata("c.jpg", "/c.jpg", None, 35.0, -119.0, None)
+        self.assertLess(haversine_meters(20.0, 10.0, 20.0001, 10.0001), 20)
+        first = PhotoMetadata("a.jpg", "/a.jpg", None, 20.0, 10.0, None)
+        near = PhotoMetadata("b.jpg", "/b.jpg", None, 20.001, 10.001, None)
+        far = PhotoMetadata("c.jpg", "/c.jpg", None, 21.0, 11.0, None)
         self.assertTrue(same_photo_area(first, near))
         self.assertFalse(same_photo_area(first, far))
 

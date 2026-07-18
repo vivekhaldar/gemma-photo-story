@@ -77,7 +77,7 @@ uv run gemma-photo-story-web --port 9000 --no-open
 
 ```sh
 uv run gemma-photo-story \
-  /Users/haldar/Downloads/testpics \
+  /path/to/your/photos \
   --output-dir output/testpics
 ```
 
