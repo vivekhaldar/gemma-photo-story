@@ -35,6 +35,33 @@ uv run gemma-photo-story --check
 
 ## Run
 
+### Single-page web app
+
+Start the loopback-only app and open it in your browser:
+
+```sh
+uv run gemma-photo-story-web
+```
+
+Then drag a folder or a set of photos onto the page. The app shows local
+progress, the resolved place and Gemma description for each image, and the
+finished narrative with copy and Markdown-download controls.
+
+Normal browser security does not reveal absolute paths for dropped files. The
+page therefore transfers the selected bytes to the Python server over
+`127.0.0.1`, where they are held in a temporary directory until the server
+stops. This is local loopback traffic, not an Internet upload. The server
+accepts only loopback `Host` headers, applies a restrictive content security
+policy, and sends only GPS coordinates to Nominatim.
+
+Use a different port or prevent the automatic browser launch if needed:
+
+```sh
+uv run gemma-photo-story-web --port 9000 --no-open
+```
+
+### Command-line app
+
 ```sh
 uv run gemma-photo-story \
   /Users/haldar/Downloads/testpics \
@@ -84,4 +111,5 @@ uv run python -m unittest discover -s tests -v
 ```
 
 The tests exercise the strict network allowlist, model-output parsing, stable
-geocoder-field extraction, and image discovery without mocking external APIs.
+geocoder-field extraction, image discovery, upload validation, and a real
+loopback HTTP session without mocking external APIs.

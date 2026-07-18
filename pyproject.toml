@@ -7,6 +7,7 @@ dependencies = []
 
 [project.scripts]
 gemma-photo-story = "gemma_photo_story.cli:main"
+gemma-photo-story-web = "gemma_photo_story.web:main"
 
 [build-system]
 requires = ["hatchling"]

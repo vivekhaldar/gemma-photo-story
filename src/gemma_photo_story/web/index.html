@@ -1,0 +1,1119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <title>Gemma Photo Story</title>
+  <style>
+    :root {
+      --paper: oklch(96% 0.018 82);
+      --paper-deep: oklch(91% 0.028 76);
+      --ink: oklch(24% 0.035 54);
+      --ink-soft: oklch(43% 0.035 58);
+      --line: oklch(78% 0.04 70);
+      --terra: oklch(56% 0.145 38);
+      --terra-dark: oklch(42% 0.12 35);
+      --moss: oklch(48% 0.08 132);
+      --moss-pale: oklch(88% 0.05 126);
+      --error: oklch(49% 0.17 27);
+      --shadow: oklch(30% 0.035 55 / 0.12);
+      --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+      --sans: "Avenir Next", Avenir, "Helvetica Neue", sans-serif;
+      --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+      --space-xs: 0.5rem;
+      --space-sm: 0.75rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --space-2xl: 3rem;
+      --space-3xl: 4.5rem;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        repeating-linear-gradient(107deg, transparent 0 74px, oklch(68% 0.04 72 / 0.09) 75px 76px),
+        var(--paper);
+      font-family: var(--sans);
+      font-size: 1rem;
+      line-height: 1.5;
+      font-kerning: normal;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right)
+        env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+
+    button, input { font: inherit; }
+
+    button { min-height: 44px; }
+
+    button:focus-visible,
+    .drop-zone:focus-visible,
+    summary:focus-visible {
+      outline: 3px solid var(--moss);
+      outline-offset: 4px;
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 0.75rem;
+      left: 0.75rem;
+      z-index: 20;
+      transform: translateY(-180%);
+      background: var(--ink);
+      color: var(--paper);
+      padding: 0.75rem 1rem;
+    }
+
+    .skip-link:focus { transform: translateY(0); }
+
+    .shell {
+      width: min(1180px, calc(100% - 2rem));
+      margin: 0 auto;
+      padding: clamp(1.5rem, 4vw, 3rem) 0 var(--space-3xl);
+    }
+
+    .masthead {
+      display: grid;
+      gap: var(--space-xl);
+      padding-bottom: clamp(2rem, 7vw, 5rem);
+      animation: arrive 650ms var(--ease-out) both;
+    }
+
+    .eyebrow,
+    .section-kicker {
+      margin: 0;
+      color: var(--terra-dark);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1 {
+      max-width: 10ch;
+      margin-bottom: 0;
+      font-family: var(--serif);
+      font-size: clamp(3.2rem, 11vw, 8.4rem);
+      font-weight: 500;
+      letter-spacing: -0.065em;
+      line-height: 0.82;
+      text-wrap: balance;
+    }
+
+    h1 em {
+      display: block;
+      color: var(--terra);
+      font-weight: 400;
+    }
+
+    .masthead-copy {
+      max-width: 38rem;
+      align-self: end;
+    }
+
+    .lede {
+      margin-bottom: var(--space-lg);
+      font-family: var(--serif);
+      font-size: clamp(1.2rem, 2.5vw, 1.7rem);
+      line-height: 1.35;
+    }
+
+    .privacy-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+    }
+
+    .badge {
+      display: inline-flex;
+      min-height: 2rem;
+      align-items: center;
+      gap: 0.55rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--paper);
+      padding: 0.35rem 0.75rem;
+      color: var(--ink-soft);
+      font-size: 0.75rem;
+      font-weight: 650;
+      letter-spacing: 0.02em;
+    }
+
+    .badge::before {
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: 50%;
+      background: var(--moss);
+      content: "";
+    }
+
+    .workspace {
+      position: relative;
+      padding-top: var(--space-lg);
+    }
+
+    .workspace::before {
+      position: absolute;
+      top: 0;
+      right: 0;
+      left: 0;
+      height: 1px;
+      background: var(--line);
+      content: "";
+    }
+
+    .section-heading {
+      display: grid;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-xl);
+    }
+
+    .section-heading h2 {
+      margin-bottom: 0;
+      font-family: var(--serif);
+      font-size: clamp(2rem, 5vw, 3.7rem);
+      font-weight: 500;
+      letter-spacing: -0.035em;
+      line-height: 1;
+    }
+
+    .drop-zone {
+      position: relative;
+      display: grid;
+      min-height: 21rem;
+      place-items: center;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: var(--paper-deep);
+      cursor: pointer;
+      isolation: isolate;
+      transition: transform 250ms var(--ease-out), background 250ms var(--ease-out);
+    }
+
+    .drop-zone::before {
+      position: absolute;
+      inset: 0.85rem;
+      z-index: -1;
+      border: 1px dashed var(--terra);
+      content: "";
+      opacity: 0.65;
+    }
+
+    .drop-zone::after {
+      position: absolute;
+      right: -4rem;
+      bottom: -4rem;
+      width: 13rem;
+      height: 13rem;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      box-shadow: inset 0 0 0 2.7rem var(--paper-deep), inset 0 0 0 2.8rem var(--line);
+      content: "";
+      opacity: 0.7;
+    }
+
+    .drop-zone.is-over {
+      background: var(--moss-pale);
+      transform: scale(0.995);
+    }
+
+    .drop-content {
+      display: grid;
+      max-width: 34rem;
+      justify-items: start;
+      gap: var(--space-md);
+      padding: var(--space-xl);
+    }
+
+    .drop-number {
+      font-family: var(--serif);
+      font-size: 4.5rem;
+      line-height: 0.8;
+      color: var(--terra);
+    }
+
+    .drop-content h3 {
+      margin-bottom: 0;
+      font-family: var(--serif);
+      font-size: clamp(1.65rem, 4vw, 2.5rem);
+      font-weight: 500;
+      letter-spacing: -0.025em;
+    }
+
+    .drop-content p {
+      max-width: 47ch;
+      margin-bottom: 0;
+      color: var(--ink-soft);
+    }
+
+    .picker-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+      margin-top: var(--space-sm);
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--ink);
+      border-radius: 0;
+      padding: 0.7rem 1.1rem;
+      background: var(--ink);
+      color: var(--paper);
+      font-weight: 700;
+      letter-spacing: 0.015em;
+      cursor: pointer;
+      transition: transform 120ms var(--ease-out), background 120ms var(--ease-out);
+    }
+
+    .button.secondary {
+      background: transparent;
+      color: var(--ink);
+    }
+
+    .button.terra {
+      border-color: var(--terra-dark);
+      background: var(--terra);
+      color: var(--paper);
+    }
+
+    .button:active { transform: translateY(1px); }
+
+    .button:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+    }
+
+    .contact-sheet {
+      display: none;
+      margin-top: var(--space-2xl);
+    }
+
+    .contact-sheet.is-visible { display: block; }
+
+    .contact-header,
+    .action-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-md);
+    }
+
+    .contact-header { margin-bottom: var(--space-md); }
+
+    .contact-header h3 {
+      margin: 0;
+      font-family: var(--serif);
+      font-size: 1.5rem;
+      font-weight: 500;
+    }
+
+    .text-button {
+      min-height: 44px;
+      border: 0;
+      background: transparent;
+      color: var(--terra-dark);
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 0.2em;
+    }
+
+    .photo-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+      gap: var(--space-sm);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .photo-tile {
+      position: relative;
+      min-width: 0;
+      animation: reveal 420ms var(--ease-out) both;
+      animation-delay: var(--delay);
+    }
+
+    .photo-frame {
+      aspect-ratio: 4 / 5;
+      overflow: hidden;
+      background: oklch(84% 0.025 74);
+    }
+
+    .photo-frame img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .photo-label {
+      overflow: hidden;
+      margin: 0.45rem 0 0;
+      font-size: 0.75rem;
+      font-weight: 650;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .action-row {
+      align-items: flex-end;
+      margin-top: var(--space-xl);
+      padding-top: var(--space-lg);
+      border-top: 1px solid var(--line);
+    }
+
+    .action-note {
+      max-width: 50ch;
+      margin: 0;
+      color: var(--ink-soft);
+      font-size: 0.875rem;
+    }
+
+    .progress-panel {
+      display: none;
+      margin-top: var(--space-3xl);
+      padding: clamp(1.5rem, 4vw, 2.5rem);
+      background: var(--ink);
+      color: var(--paper);
+    }
+
+    .progress-panel.is-visible { display: block; }
+
+    .progress-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--space-md);
+      margin-bottom: var(--space-lg);
+    }
+
+    .progress-head h2 {
+      margin: 0;
+      font-family: var(--serif);
+      font-size: clamp(1.8rem, 4vw, 3rem);
+      font-weight: 500;
+    }
+
+    .model-readout {
+      color: var(--paper-deep);
+      font-size: 0.75rem;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .progress-track {
+      height: 2px;
+      overflow: hidden;
+      background: oklch(46% 0.025 55);
+    }
+
+    .progress-fill {
+      width: 0;
+      height: 100%;
+      background: var(--paper-deep);
+      transition: transform 500ms var(--ease-out);
+      transform: scaleX(0);
+      transform-origin: left;
+    }
+
+    .status-copy {
+      margin: var(--space-md) 0 var(--space-lg);
+      color: var(--paper-deep);
+      font-size: 1rem;
+    }
+
+    details {
+      border-top: 1px solid oklch(44% 0.03 55);
+      padding-top: var(--space-sm);
+    }
+
+    summary {
+      min-height: 44px;
+      cursor: pointer;
+      color: var(--paper-deep);
+      font-size: 0.875rem;
+      font-weight: 700;
+      line-height: 44px;
+    }
+
+    .run-log {
+      max-height: 18rem;
+      overflow: auto;
+      margin: 0;
+      padding: var(--space-md) 0;
+      color: oklch(86% 0.025 75);
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.75rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    .error-banner {
+      display: none;
+      margin-top: var(--space-lg);
+      border: 1px solid var(--error);
+      padding: var(--space-md);
+      color: var(--error);
+      background: oklch(94% 0.035 28);
+    }
+
+    .error-banner.is-visible { display: block; }
+
+    .story-section {
+      display: none;
+      padding-top: var(--space-3xl);
+      animation: arrive 650ms var(--ease-out) both;
+    }
+
+    .story-section.is-visible { display: block; }
+
+    .story-layout {
+      display: grid;
+      gap: var(--space-2xl);
+    }
+
+    .story-tools {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+    }
+
+    .story-paper {
+      position: relative;
+      max-width: 52rem;
+      border-top: 4px solid var(--terra);
+      padding: clamp(2rem, 6vw, 5rem) clamp(1rem, 5vw, 4rem);
+      background: oklch(98% 0.012 83);
+      box-shadow: 0 1.5rem 4rem var(--shadow);
+    }
+
+    .story-paper::before {
+      position: absolute;
+      top: 1rem;
+      right: 1.2rem;
+      color: var(--line);
+      font-family: var(--serif);
+      font-size: 0.75rem;
+      letter-spacing: 0.18em;
+      content: "GEMMA / FIELD NOTES";
+    }
+
+    .story-content {
+      font-family: var(--serif);
+      font-size: clamp(1.08rem, 2vw, 1.25rem);
+      line-height: 1.72;
+    }
+
+    .story-content h1 {
+      max-width: 14ch;
+      margin: 0 0 var(--space-2xl);
+      font-size: clamp(2.5rem, 7vw, 5rem);
+      line-height: 0.98;
+    }
+
+    .story-content h2,
+    .story-content h3 {
+      margin: var(--space-2xl) 0 var(--space-sm);
+      font-family: var(--sans);
+      font-size: 0.875rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .story-content p { margin: 0 0 var(--space-lg); }
+
+    .story-content hr {
+      width: 4rem;
+      margin: var(--space-2xl) 0;
+      border: 0;
+      border-top: 1px solid var(--terra);
+    }
+
+    .evidence {
+      align-self: start;
+    }
+
+    .evidence h3 {
+      margin-bottom: var(--space-lg);
+      font-family: var(--serif);
+      font-size: 1.6rem;
+      font-weight: 500;
+    }
+
+    .evidence-list {
+      display: grid;
+      gap: var(--space-lg);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .evidence-item {
+      border-top: 1px solid var(--line);
+      padding-top: var(--space-md);
+    }
+
+    .evidence-place {
+      margin-bottom: 0.3rem;
+      color: var(--terra-dark);
+      font-size: 0.75rem;
+      font-weight: 750;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .evidence-description {
+      margin: 0;
+      color: var(--ink-soft);
+      font-family: var(--serif);
+      font-size: 1rem;
+      line-height: 1.55;
+    }
+
+    .footer {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: var(--space-md);
+      margin-top: var(--space-3xl);
+      border-top: 1px solid var(--line);
+      padding-top: var(--space-lg);
+      color: var(--ink-soft);
+      font-size: 0.75rem;
+    }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    @keyframes arrive {
+      from { opacity: 0; transform: translateY(1rem); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes reveal {
+      from { opacity: 0; transform: translateY(0.6rem); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (min-width: 48rem) {
+      .masthead {
+        grid-template-columns: minmax(0, 1.4fr) minmax(18rem, 0.6fr);
+        align-items: end;
+      }
+
+      .drop-zone { min-height: 25rem; }
+
+      .drop-content { transform: translateX(-16%); }
+
+      .story-layout {
+        grid-template-columns: minmax(0, 2fr) minmax(16rem, 0.7fr);
+        align-items: start;
+      }
+
+      .evidence { position: sticky; top: 1.5rem; }
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+      .button:hover { transform: translateY(-2px); }
+      .button.secondary:hover { background: var(--paper-deep); }
+      .drop-zone:hover { background: oklch(89% 0.04 78); }
+    }
+
+    @media (max-width: 40rem) {
+      .shell { width: min(100% - 1.25rem, 1180px); }
+      .action-row, .progress-head { align-items: stretch; flex-direction: column; }
+      .action-row .button { width: 100%; }
+      .story-paper { margin-inline: -0.625rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-delay: 0ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to photo selection</a>
+  <div class="shell">
+    <header class="masthead">
+      <div>
+        <p class="eyebrow">A private travel-story maker</p>
+        <h1>Photos into <em>memory.</em></h1>
+      </div>
+      <div class="masthead-copy">
+        <p class="lede">Drop a journey. Local Gemma reads the photographs; their coordinates place the chapters.</p>
+        <div class="privacy-row">
+          <span class="badge">Photos stay on this Mac</span>
+          <span class="badge" id="modelBadge">Model: gemma4:26b</span>
+        </div>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <section class="workspace" aria-labelledby="selectTitle">
+        <div class="section-heading">
+          <p class="section-kicker">01 / Select the journey</p>
+          <h2 id="selectTitle">Bring the camera roll.</h2>
+        </div>
+
+        <div class="drop-zone" id="dropZone" role="region" aria-label="Photo drop area" aria-describedby="privacyExplanation">
+          <div class="drop-content">
+            <span class="drop-number" aria-hidden="true">01</span>
+            <h3>Drop photos or an entire folder</h3>
+            <p>HEIC, JPEG, PNG, WebP, and TIFF are welcome. Nothing is sent to a cloud image service.</p>
+            <div class="picker-row">
+              <button class="button" type="button" id="choosePhotos">Choose photos</button>
+              <button class="button secondary" type="button" id="chooseFolder">Choose a folder</button>
+            </div>
+          </div>
+        </div>
+
+        <input id="photoInput" type="file" accept="image/*,.heic,.heif,.tif,.tiff" multiple hidden>
+        <input id="folderInput" type="file" accept="image/*,.heic,.heif,.tif,.tiff" multiple webkitdirectory hidden>
+
+        <p class="action-note" id="privacyExplanation" style="margin-top: 1rem;">
+          Browsers hide absolute paths. The page therefore passes selected photo bytes only to this loopback app, where temporary local files are analyzed. Only GPS coordinates leave the Mac for OpenStreetMap geocoding.
+        </p>
+
+        <div class="contact-sheet" id="contactSheet">
+          <div class="contact-header">
+            <h3 id="photoCount">0 photographs</h3>
+            <button class="text-button" type="button" id="clearPhotos">Clear selection</button>
+          </div>
+          <ul class="photo-strip" id="photoStrip" aria-live="polite"></ul>
+          <div class="action-row">
+            <p class="action-note">Gemma examines each image locally, then writes one evidence-grounded narrative in chronological order.</p>
+            <button class="button terra" type="button" id="createStory">Create the travel story</button>
+          </div>
+        </div>
+
+        <div class="error-banner" id="errorBanner" role="alert"></div>
+      </section>
+
+      <section class="progress-panel" id="progressPanel" aria-live="polite" aria-labelledby="progressTitle">
+        <div class="progress-head">
+          <h2 id="progressTitle">Reading the journey</h2>
+          <span class="model-readout" id="modelReadout">Local model / gemma4:26b</span>
+        </div>
+        <div class="progress-track" aria-hidden="true"><div class="progress-fill" id="progressFill"></div></div>
+        <p class="status-copy" id="statusCopy">Preparing photographs locally…</p>
+        <details>
+          <summary>View processing details</summary>
+          <pre class="run-log" id="runLog"></pre>
+        </details>
+      </section>
+
+      <section class="story-section" id="storySection" aria-labelledby="storyRegionTitle">
+        <div class="section-heading">
+          <p class="section-kicker">02 / The finished recollection</p>
+          <h2 id="storyRegionTitle">Your journey, remembered.</h2>
+        </div>
+        <div class="story-tools">
+          <button class="button" type="button" id="copyStory">Copy narrative</button>
+          <button class="button secondary" type="button" id="saveStory">Save Markdown</button>
+          <button class="text-button" type="button" id="startAgain">Start another story</button>
+        </div>
+        <div class="story-layout" style="margin-top: 2rem;">
+          <article class="story-paper">
+            <div class="story-content" id="storyContent"></div>
+          </article>
+          <aside class="evidence" aria-labelledby="evidenceTitle">
+            <h3 id="evidenceTitle">Field notes</h3>
+            <ol class="evidence-list" id="evidenceList"></ol>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>Gemma Photo Story · loopback-only image processing</span>
+      <span>Place data © OpenStreetMap contributors</span>
+    </footer>
+  </div>
+
+  <script>
+    const SUPPORTED = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif", "tif", "tiff"]);
+    const state = { files: [], objectUrls: [], sessionId: null, story: "", model: "gemma4:26b", polling: false };
+    const $ = (selector) => document.querySelector(selector);
+
+    const elements = {
+      dropZone: $("#dropZone"),
+      photoInput: $("#photoInput"),
+      folderInput: $("#folderInput"),
+      contactSheet: $("#contactSheet"),
+      photoStrip: $("#photoStrip"),
+      photoCount: $("#photoCount"),
+      createStory: $("#createStory"),
+      progressPanel: $("#progressPanel"),
+      progressFill: $("#progressFill"),
+      statusCopy: $("#statusCopy"),
+      runLog: $("#runLog"),
+      errorBanner: $("#errorBanner"),
+      storySection: $("#storySection"),
+      storyContent: $("#storyContent"),
+      evidenceList: $("#evidenceList"),
+      modelBadge: $("#modelBadge"),
+      modelReadout: $("#modelReadout")
+    };
+
+    function isSupported(file) {
+      const extension = file.name.split(".").pop().toLowerCase();
+      return SUPPORTED.has(extension);
+    }
+
+    function fileKey(file) {
+      return `${file.webkitRelativePath || file.name}:${file.size}:${file.lastModified}`;
+    }
+
+    function addFiles(incoming) {
+      const known = new Set(state.files.map(fileKey));
+      const additions = Array.from(incoming).filter(isSupported).filter((file) => {
+        const key = fileKey(file);
+        if (known.has(key)) return false;
+        known.add(key);
+        return true;
+      });
+      state.files = state.files.concat(additions).sort((a, b) =>
+        (a.lastModified - b.lastModified) || a.name.localeCompare(b.name)
+      );
+      if (!additions.length && incoming.length) {
+        showError("Those items did not contain a supported photo. Choose HEIC, JPEG, PNG, WebP, or TIFF files.");
+      } else {
+        hideError();
+      }
+      renderPhotos();
+    }
+
+    function clearObjectUrls() {
+      state.objectUrls.forEach((url) => URL.revokeObjectURL(url));
+      state.objectUrls = [];
+    }
+
+    function renderPhotos() {
+      clearObjectUrls();
+      elements.photoStrip.replaceChildren();
+      state.files.forEach((file, index) => {
+        const item = document.createElement("li");
+        item.className = "photo-tile";
+        item.style.setProperty("--delay", `${Math.min(index, 8) * 45}ms`);
+        const frame = document.createElement("div");
+        frame.className = "photo-frame";
+        const image = document.createElement("img");
+        const url = URL.createObjectURL(file);
+        state.objectUrls.push(url);
+        image.src = url;
+        image.alt = `Selected photograph ${index + 1}: ${file.name}`;
+        image.loading = "lazy";
+        frame.append(image);
+        const label = document.createElement("p");
+        label.className = "photo-label";
+        label.textContent = file.name;
+        item.append(frame, label);
+        elements.photoStrip.append(item);
+      });
+      const count = state.files.length;
+      elements.photoCount.textContent = `${count} ${count === 1 ? "photograph" : "photographs"}`;
+      elements.contactSheet.classList.toggle("is-visible", count > 0);
+      elements.createStory.disabled = count === 0;
+    }
+
+    async function readEntry(entry, files) {
+      if (entry.isFile) {
+        const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
+        files.push(file);
+        return;
+      }
+      if (!entry.isDirectory) return;
+      const reader = entry.createReader();
+      while (true) {
+        const batch = await new Promise((resolve, reject) => reader.readEntries(resolve, reject));
+        if (!batch.length) break;
+        for (const child of batch) await readEntry(child, files);
+      }
+    }
+
+    async function filesFromDrop(dataTransfer) {
+      const files = [];
+      const items = Array.from(dataTransfer.items || []);
+      if (items.length && items.some((item) => item.webkitGetAsEntry)) {
+        for (const item of items) {
+          const entry = item.webkitGetAsEntry && item.webkitGetAsEntry();
+          if (entry) await readEntry(entry, files);
+        }
+        return files;
+      }
+      return Array.from(dataTransfer.files || []);
+    }
+
+    function setProgress(fraction, message) {
+      elements.progressFill.style.transform = `scaleX(${Math.max(0, Math.min(1, fraction))})`;
+      elements.statusCopy.textContent = message;
+    }
+
+    function showError(message) {
+      elements.errorBanner.textContent = message;
+      elements.errorBanner.classList.add("is-visible");
+    }
+
+    function hideError() {
+      elements.errorBanner.classList.remove("is-visible");
+      elements.errorBanner.textContent = "";
+    }
+
+    async function fetchJson(url, options = {}) {
+      const response = await fetch(url, options);
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || `The local app returned HTTP ${response.status}.`);
+      return result;
+    }
+
+    async function createStory() {
+      if (!state.files.length) return;
+      hideError();
+      elements.createStory.disabled = true;
+      elements.progressPanel.classList.add("is-visible");
+      elements.storySection.classList.remove("is-visible");
+      setProgress(0.03, "Creating a private local workspace…");
+      elements.progressPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      try {
+        const session = await fetchJson("/api/sessions", { method: "POST" });
+        state.sessionId = session.id;
+        history.replaceState(null, "", `?session=${state.sessionId}`);
+        for (let index = 0; index < state.files.length; index += 1) {
+          const file = state.files[index];
+          setProgress(0.05 + ((index + 1) / state.files.length) * 0.15, `Passing photograph ${index + 1} of ${state.files.length} to the local app…`);
+          await fetchJson(`/api/sessions/${state.sessionId}/files?name=${encodeURIComponent(file.name)}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/octet-stream" },
+            body: file
+          });
+        }
+        await fetchJson(`/api/sessions/${state.sessionId}/process`, { method: "POST" });
+        state.polling = true;
+        await pollSession();
+      } catch (error) {
+        failRun(error.message);
+      }
+    }
+
+    function progressFromLogs(logs, total) {
+      const described = logs.filter((line) => line.includes("Image description from")).length;
+      if (logs.some((line) => line.includes("Writing narrative with model"))) {
+        return [0.93, `Gemma ${state.model} is weaving the narrative…`];
+      }
+      const currentDescription = [...logs].reverse().find((line) => line.includes("] Describing "));
+      if (currentDescription) {
+        const match = currentDescription.match(/Describing (.+?) with model/);
+        return [0.25 + (described / Math.max(total, 1)) * 0.62, `Gemma is reading ${match ? match[1] : "the next photograph"}…`];
+      }
+      if (logs.some((line) => line.includes("Reverse-geocoding GPS"))) {
+        return [0.23 + (described / Math.max(total, 1)) * 0.62, "Placing the next photograph on the map…"];
+      }
+      return [0.21, "Reading timestamps and GPS metadata locally…"];
+    }
+
+    async function pollSession() {
+      while (state.polling) {
+        try {
+          const session = await fetchJson(`/api/sessions/${state.sessionId}`);
+          elements.runLog.textContent = session.logs.join("\n\n");
+          elements.runLog.scrollTop = elements.runLog.scrollHeight;
+          if (session.status === "complete") {
+            state.polling = false;
+            state.story = session.story;
+            setProgress(1, "The story is ready.");
+            renderStory(session.story, session.analysis || []);
+            return;
+          }
+          if (session.status === "error") {
+            throw new Error(session.error || "The local analysis stopped unexpectedly.");
+          }
+          const [fraction, message] = progressFromLogs(session.logs, state.files.length);
+          setProgress(fraction, message);
+          await new Promise((resolve) => setTimeout(resolve, 700));
+        } catch (error) {
+          state.polling = false;
+          failRun(error.message);
+        }
+      }
+    }
+
+    function escapeHtml(value) {
+      return value.replace(/[&<>"']/g, (character) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;"
+      })[character]);
+    }
+
+    function inlineMarkdown(value) {
+      return value
+        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+        .replace(/\*(.+?)\*/g, "<em>$1</em>");
+    }
+
+    function renderMarkdown(markdown) {
+      const lines = escapeHtml(markdown.trim()).split("\n");
+      const output = [];
+      let paragraph = [];
+      const flushParagraph = () => {
+        if (paragraph.length) {
+          output.push(`<p>${inlineMarkdown(paragraph.join(" "))}</p>`);
+          paragraph = [];
+        }
+      };
+      lines.forEach((line) => {
+        const trimmed = line.trim();
+        if (!trimmed) { flushParagraph(); return; }
+        if (/^---+$/.test(trimmed) || /^\*\*\*$/.test(trimmed)) { flushParagraph(); output.push("<hr>"); return; }
+        const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
+        if (heading) {
+          flushParagraph();
+          const level = heading[1].length;
+          output.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);
+          return;
+        }
+        paragraph.push(trimmed);
+      });
+      flushParagraph();
+      return output.join("");
+    }
+
+    function bestPlace(place) {
+      if (!place) return "Location unavailable";
+      return place.named_place?.name || place.name || place.city || place.locality || place.label || "Nearby mapped place";
+    }
+
+    function renderStory(story, analysis) {
+      elements.storyContent.innerHTML = renderMarkdown(story);
+      elements.evidenceList.replaceChildren();
+      analysis.forEach((item) => {
+        const row = document.createElement("li");
+        row.className = "evidence-item";
+        const place = document.createElement("p");
+        place.className = "evidence-place";
+        place.textContent = bestPlace(item.place);
+        const description = document.createElement("p");
+        description.className = "evidence-description";
+        description.textContent = item.visual?.concise_description || "Gemma description unavailable.";
+        row.append(place, description);
+        elements.evidenceList.append(row);
+      });
+      elements.storySection.classList.add("is-visible");
+      setTimeout(() => elements.storySection.scrollIntoView({ behavior: "smooth", block: "start" }), 250);
+      elements.createStory.disabled = false;
+    }
+
+    function failRun(message) {
+      elements.createStory.disabled = false;
+      showError(`${message} Check that Ollama is running with ${state.model}, then try again.`);
+      setProgress(0, "The story could not be completed.");
+      elements.errorBanner.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    async function copyStory() {
+      try {
+        await navigator.clipboard.writeText(state.story);
+        const button = $("#copyStory");
+        const original = button.textContent;
+        button.textContent = "Narrative copied";
+        setTimeout(() => { button.textContent = original; }, 1500);
+      } catch {
+        showError("The browser could not copy the narrative. Use Save Markdown instead.");
+      }
+    }
+
+    function saveStory() {
+      const blob = new Blob([state.story], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "gemma-photo-story.md";
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function resetApp() {
+      state.polling = false;
+      state.files = [];
+      state.sessionId = null;
+      state.story = "";
+      renderPhotos();
+      elements.progressPanel.classList.remove("is-visible");
+      elements.storySection.classList.remove("is-visible");
+      elements.runLog.textContent = "";
+      hideError();
+      history.replaceState(null, "", location.pathname);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    async function resumeSessionFromUrl() {
+      const identifier = new URLSearchParams(location.search).get("session");
+      if (!identifier || !/^[a-f0-9]{32}$/.test(identifier)) return;
+      state.sessionId = identifier;
+      state.polling = true;
+      elements.progressPanel.classList.add("is-visible");
+      setProgress(0.2, "Reopening the local photo session…");
+      await pollSession();
+    }
+
+    async function loadConfig() {
+      try {
+        const config = await fetchJson("/api/config");
+        state.model = config.model;
+        elements.modelBadge.textContent = `Model: ${state.model}`;
+        elements.modelReadout.textContent = `Local model / ${state.model}`;
+        await resumeSessionFromUrl();
+      } catch (error) {
+        showError(`The local app is not responding. ${error.message}`);
+      }
+    }
+
+    elements.dropZone.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      elements.dropZone.classList.add("is-over");
+    });
+    elements.dropZone.addEventListener("dragleave", () => elements.dropZone.classList.remove("is-over"));
+    elements.dropZone.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      elements.dropZone.classList.remove("is-over");
+      try { addFiles(await filesFromDrop(event.dataTransfer)); }
+      catch (error) { showError(`The folder could not be read. ${error.message}`); }
+    });
+    $("#choosePhotos").addEventListener("click", (event) => { event.stopPropagation(); elements.photoInput.click(); });
+    $("#chooseFolder").addEventListener("click", (event) => { event.stopPropagation(); elements.folderInput.click(); });
+    elements.photoInput.addEventListener("change", (event) => addFiles(event.target.files));
+    elements.folderInput.addEventListener("change", (event) => addFiles(event.target.files));
+    $("#clearPhotos").addEventListener("click", () => { state.files = []; renderPhotos(); });
+    elements.createStory.addEventListener("click", createStory);
+    $("#copyStory").addEventListener("click", copyStory);
+    $("#saveStory").addEventListener("click", saveStory);
+    $("#startAgain").addEventListener("click", resetApp);
+    window.addEventListener("beforeunload", clearObjectUrls);
+
+    loadConfig();
+  </script>
+</body>
+</html>

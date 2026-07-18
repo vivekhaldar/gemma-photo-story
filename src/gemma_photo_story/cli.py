@@ -12,6 +12,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -716,12 +717,25 @@ def check_prerequisites(ollama_url: str, model: str) -> None:
         )
 
 
-def print_json_log(label: str, value: Any) -> None:
+def console_log(message: str) -> None:
+    print(message, flush=True)
+
+
+def print_json_log(
+    label: str,
+    value: Any,
+    *,
+    logger: Callable[[str], None] = console_log,
+) -> None:
     rendered = json.dumps(value, indent=2, ensure_ascii=False, sort_keys=True)
-    print(f"{label}:\n{rendered}", flush=True)
+    logger(f"{label}:\n{rendered}")
 
 
-def run(args: argparse.Namespace) -> tuple[Path, Path]:
+def run(
+    args: argparse.Namespace,
+    *,
+    logger: Callable[[str], None] = console_log,
+) -> tuple[Path, Path]:
     check_prerequisites(args.ollama_url, args.model)
     images = discover_images(args.images)
     metadata = extract_metadata(images)
@@ -735,21 +749,20 @@ def run(args: argparse.Namespace) -> tuple[Path, Path]:
         for index, item in enumerate(metadata, start=1):
             place = None
             if item.latitude is not None and item.longitude is not None:
-                print(f"[{index}/{len(metadata)}] Reverse-geocoding GPS", flush=True)
+                logger(f"[{index}/{len(metadata)}] Reverse-geocoding GPS")
                 place = geocoder.reverse(item.latitude, item.longitude)
                 print_json_log(
                     f"[{index}/{len(metadata)}] Reverse-geocode result",
                     place,
+                    logger=logger,
                 )
             else:
-                print(
-                    f"[{index}/{len(metadata)}] Reverse-geocode skipped: no GPS metadata",
-                    flush=True,
+                logger(
+                    f"[{index}/{len(metadata)}] Reverse-geocode skipped: no GPS metadata"
                 )
-            print(
+            logger(
                 f"[{index}/{len(metadata)}] Describing {item.file_name} "
-                f"with model {args.model}",
-                flush=True,
+                f"with model {args.model}"
             )
             jpeg_path = temp_dir / f"{index:04d}-{Path(item.file_name).stem}.jpg"
             prepare_jpeg(Path(item.source_path), jpeg_path, args.max_image_dimension)
@@ -763,6 +776,7 @@ def run(args: argparse.Namespace) -> tuple[Path, Path]:
             print_json_log(
                 f"[{index}/{len(metadata)}] Image description from {args.model}",
                 visual,
+                logger=logger,
             )
             analyses.append(PhotoAnalysis(metadata=item, place=place, visual=visual))
 
@@ -772,7 +786,7 @@ def run(args: argparse.Namespace) -> tuple[Path, Path]:
         + "\n",
         encoding="utf-8",
     )
-    print(f"Writing narrative with model {args.model}", flush=True)
+    logger(f"Writing narrative with model {args.model}")
     story = write_story(
         analyses,
         ollama_url=args.ollama_url,
