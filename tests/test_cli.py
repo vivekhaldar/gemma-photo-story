@@ -2,6 +2,8 @@ import json
 import tempfile
 import unittest
 import urllib.request
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 
 from gemma_photo_story.cli import (
@@ -12,6 +14,7 @@ from gemma_photo_story.cli import (
     haversine_meters,
     parse_geocode_result,
     parse_json_object,
+    print_json_log,
     same_photo_area,
     select_named_candidate,
     validate_network_url,
@@ -75,6 +78,19 @@ class NetworkPolicyTests(unittest.TestCase):
 
 
 class ParsingTests(unittest.TestCase):
+    def test_prints_readable_json_log(self) -> None:
+        stream = StringIO()
+        with redirect_stdout(stream):
+            print_json_log(
+                "Reverse-geocode result",
+                {"city": "Santa Bárbara", "name": "Courthouse"},
+            )
+        self.assertEqual(
+            stream.getvalue(),
+            'Reverse-geocode result:\n{\n  "city": "Santa Bárbara",\n'
+            '  "name": "Courthouse"\n}\n',
+        )
+
     def test_parses_plain_and_fenced_json(self) -> None:
         self.assertEqual(parse_json_object('{"mood": "quiet"}'), {"mood": "quiet"})
         self.assertEqual(

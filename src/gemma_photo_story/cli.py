@@ -716,6 +716,11 @@ def check_prerequisites(ollama_url: str, model: str) -> None:
         )
 
 
+def print_json_log(label: str, value: Any) -> None:
+    rendered = json.dumps(value, indent=2, ensure_ascii=False, sort_keys=True)
+    print(f"{label}:\n{rendered}", flush=True)
+
+
 def run(args: argparse.Namespace) -> tuple[Path, Path]:
     check_prerequisites(args.ollama_url, args.model)
     images = discover_images(args.images)
@@ -732,7 +737,20 @@ def run(args: argparse.Namespace) -> tuple[Path, Path]:
             if item.latitude is not None and item.longitude is not None:
                 print(f"[{index}/{len(metadata)}] Reverse-geocoding GPS", flush=True)
                 place = geocoder.reverse(item.latitude, item.longitude)
-            print(f"[{index}/{len(metadata)}] Describing {item.file_name}", flush=True)
+                print_json_log(
+                    f"[{index}/{len(metadata)}] Reverse-geocode result",
+                    place,
+                )
+            else:
+                print(
+                    f"[{index}/{len(metadata)}] Reverse-geocode skipped: no GPS metadata",
+                    flush=True,
+                )
+            print(
+                f"[{index}/{len(metadata)}] Describing {item.file_name} "
+                f"with model {args.model}",
+                flush=True,
+            )
             jpeg_path = temp_dir / f"{index:04d}-{Path(item.file_name).stem}.jpg"
             prepare_jpeg(Path(item.source_path), jpeg_path, args.max_image_dimension)
             visual = describe_image(
@@ -742,6 +760,10 @@ def run(args: argparse.Namespace) -> tuple[Path, Path]:
                 ollama_url=args.ollama_url,
                 model=args.model,
             )
+            print_json_log(
+                f"[{index}/{len(metadata)}] Image description from {args.model}",
+                visual,
+            )
             analyses.append(PhotoAnalysis(metadata=item, place=place, visual=visual))
 
     analysis_path = output_dir / "analysis.json"
@@ -750,7 +772,7 @@ def run(args: argparse.Namespace) -> tuple[Path, Path]:
         + "\n",
         encoding="utf-8",
     )
-    print("Writing narrative with local Gemma", flush=True)
+    print(f"Writing narrative with model {args.model}", flush=True)
     story = write_story(
         analyses,
         ollama_url=args.ollama_url,

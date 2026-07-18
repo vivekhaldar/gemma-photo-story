@@ -49,6 +49,10 @@ Generated files:
 - `geocode-cache.json`: cached Nominatim results, preventing duplicate remote
   lookups on reruns.
 
+During a run, the CLI also prints each reverse-geocode result and structured
+Gemma image description as readable JSON. Every image-description line and the
+final narrative-writing line identify the exact Ollama model being used.
+
 The default model is `gemma4:26b`. Override it with `--model` if another local
 Ollama vision model is installed.
 
