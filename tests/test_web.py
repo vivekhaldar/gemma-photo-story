@@ -2,6 +2,7 @@ import base64
 import json
 import tempfile
 import threading
+import time
 import unittest
 import urllib.error
 import urllib.request
@@ -14,6 +15,7 @@ from gemma_photo_story.web import (
     is_allowed_host_header,
     is_allowed_origin,
     sanitize_upload_name,
+    validate_cached_results,
 )
 
 
@@ -47,6 +49,29 @@ class UploadValidationTests(unittest.TestCase):
         self.assertFalse(is_allowed_origin("http://127.0.0.1:9000", 8765))
         self.assertFalse(is_allowed_origin("https://example.com", 8765))
 
+    def test_validates_browser_cached_results_against_uploaded_photos(self) -> None:
+        places, visuals, story = validate_cached_results(
+            {
+                "cached_places": {"photo.jpg": {"city": "Newport Beach"}},
+                "cached_visuals": {"photo.jpg": {"concise_description": "A pier."}},
+                "cached_story": "# Along the water",
+            },
+            {"photo.jpg"},
+        )
+        self.assertEqual(places["photo.jpg"]["city"], "Newport Beach")
+        self.assertEqual(visuals["photo.jpg"]["concise_description"], "A pier.")
+        self.assertEqual(story, "# Along the water")
+
+    def test_rejects_malformed_or_unknown_cached_results(self) -> None:
+        invalid_values = (
+            {"cached_places": []},
+            {"cached_visuals": {"unknown.jpg": {}}},
+            {"cached_story": ""},
+        )
+        for value in invalid_values:
+            with self.subTest(value=value), self.assertRaises(StoryError):
+                validate_cached_results(value, {"photo.jpg"})
+
 
 class StaticPageTests(unittest.TestCase):
     def test_single_page_has_drop_story_and_no_remote_assets(self) -> None:
@@ -55,6 +80,9 @@ class StaticPageTests(unittest.TestCase):
         self.assertIn('id="storyContent"', page)
         self.assertIn("webkitdirectory", page)
         self.assertIn("Preparing local preview", page)
+        self.assertIn("localStorage", page)
+        self.assertIn('id="clearCache"', page)
+        self.assertIn('className = "story-photo"', page)
         self.assertNotIn("<script src=", page)
         self.assertNotIn("<link rel=\"stylesheet\"", page)
         self.assertNotIn("https://", page)
@@ -116,6 +144,7 @@ class LoopbackServerTests(unittest.TestCase):
         self.assertEqual(status, 201)
         self.assertEqual(uploaded["file_name"], "IMG_0001.png")
         self.assertTrue(uploaded["preview_url"].endswith("IMG_0001.png.preview.jpg"))
+        self.assertEqual(uploaded["metadata"]["file_name"], "IMG_0001.png")
         with self.opener.open(f"{self.origin}{uploaded['preview_url']}", timeout=2) as response:
             preview = response.read()
             self.assertEqual(response.status, 200)
@@ -123,6 +152,7 @@ class LoopbackServerTests(unittest.TestCase):
             self.assertEqual(preview[:2], b"\xff\xd8")
         _, snapshot = self.request_json(f"/api/sessions/{session['id']}")
         self.assertEqual(snapshot["file_count"], 1)
+        self.assertEqual(snapshot["photos"][0]["preview_url"], uploaded["preview_url"])
 
     def test_rejects_invalid_image_bytes_without_retaining_file(self) -> None:
         _, session = self.request_json("/api/sessions", method="POST", data=b"")
@@ -177,6 +207,90 @@ class LoopbackServerTests(unittest.TestCase):
             self.assertIn("Drop at least one", error["error"])
         finally:
             response.close()
+
+    def test_rejects_cache_entries_for_photos_outside_the_session(self) -> None:
+        _, session = self.request_json("/api/sessions", method="POST", data=b"")
+        self.request_json(
+            f"/api/sessions/{session['id']}/files?name=photo.png",
+            method="PUT",
+            data=TINY_PNG,
+        )
+        request = urllib.request.Request(
+            f"{self.origin}/api/sessions/{session['id']}/process",
+            data=json.dumps({"cached_visuals": {"other.png": {}}}).encode(),
+            method="POST",
+            headers={"Content-Type": "application/json"},
+        )
+        with self.assertRaises(urllib.error.HTTPError) as context:
+            self.opener.open(request, timeout=2)
+        response = context.exception
+        try:
+            self.assertEqual(response.code, 400)
+            error = json.loads(response.read().decode("utf-8"))
+            self.assertIn("unknown photo", error["error"])
+        finally:
+            response.close()
+        _, snapshot = self.request_json(f"/api/sessions/{session['id']}")
+        self.assertEqual(snapshot["status"], "selecting")
+
+    def test_processes_a_gps_photo_entirely_from_browser_cache(self) -> None:
+        source = Path(self.temporary_directory.name) / "cached-source.png"
+        jpeg = Path(self.temporary_directory.name) / "cached-source.jpg"
+        source.write_bytes(TINY_PNG)
+        run_checked(["sips", "-s", "format", "jpeg", str(source), "--out", str(jpeg)])
+        run_checked(
+            [
+                "exiftool",
+                "-overwrite_original",
+                "-GPSLatitude=33.6175",
+                "-GPSLatitudeRef=N",
+                "-GPSLongitude=117.9298",
+                "-GPSLongitudeRef=W",
+                str(jpeg),
+            ]
+        )
+        _, session = self.request_json("/api/sessions", method="POST", data=b"")
+        _, uploaded = self.request_json(
+            f"/api/sessions/{session['id']}/files?name=cached.jpg",
+            method="PUT",
+            data=jpeg.read_bytes(),
+        )
+        cached_place = {"city": "Newport Beach", "label": "Newport Beach, California"}
+        cached_visual = {
+            "concise_description": "Sunlight falls across a coastal scene.",
+            "subjects": ["coast"],
+        }
+        cached_story = "# A Cached Coast\n\nThe coast returns without another model call."
+        payload = json.dumps(
+            {
+                "cached_places": {uploaded["file_name"]: cached_place},
+                "cached_visuals": {uploaded["file_name"]: cached_visual},
+                "cached_story": cached_story,
+            }
+        ).encode()
+        status, _ = self.request_json(
+            f"/api/sessions/{session['id']}/process",
+            method="POST",
+            data=payload,
+        )
+        self.assertEqual(status, 202)
+        snapshot = {}
+        for _ in range(40):
+            _, snapshot = self.request_json(f"/api/sessions/{session['id']}")
+            if snapshot["status"] != "running":
+                break
+            time.sleep(0.05)
+        self.assertEqual(snapshot["status"], "complete", snapshot.get("error"))
+        self.assertEqual(snapshot["cache_hits"], {"places": 1, "descriptions": 1, "narrative": 1})
+        self.assertEqual(snapshot["analysis"][0]["place"], cached_place)
+        self.assertEqual(snapshot["analysis"][0]["visual"], cached_visual)
+        self.assertEqual(snapshot["story"].strip(), cached_story)
+        logs = "\n".join(snapshot["logs"])
+        self.assertIn("Using browser-cached reverse geocode", logs)
+        self.assertIn("Using browser-cached image description", logs)
+        self.assertIn("Using browser-cached narrative", logs)
+        self.assertNotIn("Reverse-geocoding GPS", logs)
+        self.assertNotIn("] Describing ", logs)
 
 
 if __name__ == "__main__":

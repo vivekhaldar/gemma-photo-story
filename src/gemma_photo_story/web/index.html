@@ -312,6 +312,20 @@
 
     .contact-header { margin-bottom: var(--space-md); }
 
+    .contact-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+      gap: var(--space-sm);
+    }
+
+    .cache-summary {
+      margin: 0;
+      color: var(--ink-soft);
+      font-size: 0.75rem;
+    }
+
     .contact-header h3 {
       margin: 0;
       font-family: var(--serif);
@@ -564,6 +578,38 @@
       border-top: 1px solid var(--terra);
     }
 
+    .story-photo {
+      margin: var(--space-xl) 0 var(--space-2xl);
+    }
+
+    .story-photo img {
+      display: block;
+      width: 100%;
+      max-height: 38rem;
+      background: var(--paper-deep);
+      object-fit: contain;
+    }
+
+    .story-photo figcaption {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: var(--space-xs) var(--space-md);
+      border-bottom: 1px solid var(--line);
+      padding: var(--space-sm) 0;
+      color: var(--ink-soft);
+      font-family: var(--sans);
+      font-size: 0.75rem;
+      line-height: 1.45;
+    }
+
+    .story-photo-place {
+      color: var(--terra-dark);
+      font-weight: 750;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
     .evidence {
       align-self: start;
     }
@@ -665,6 +711,8 @@
       .shell { width: min(100% - 1.25rem, 1180px); }
       .action-row, .progress-head { align-items: stretch; flex-direction: column; }
       .action-row .button { width: 100%; }
+      .contact-header { align-items: flex-start; flex-direction: column; }
+      .contact-actions { justify-content: flex-start; }
       .story-paper { margin-inline: -0.625rem; }
     }
 
@@ -724,11 +772,15 @@
         <div class="contact-sheet" id="contactSheet">
           <div class="contact-header">
             <h3 id="photoCount">0 photographs</h3>
-            <button class="text-button" type="button" id="clearPhotos">Clear selection</button>
+            <div class="contact-actions">
+              <p class="cache-summary" id="cacheSummary">Saved results are checked after local previews are ready.</p>
+              <button class="text-button" type="button" id="clearCache">Clear saved results</button>
+              <button class="text-button" type="button" id="clearPhotos">Clear selection</button>
+            </div>
           </div>
           <ul class="photo-strip" id="photoStrip" aria-live="polite"></ul>
           <div class="action-row">
-            <p class="action-note">Gemma examines each image locally, then writes one evidence-grounded narrative in chronological order.</p>
+            <p class="action-note">Gemma examines each image locally, then writes one evidence-grounded narrative in chronological order. Place names and Gemma results—not photo bytes—are saved in this browser for reuse.</p>
             <button class="button terra" type="button" id="createStory">Create the travel story</button>
           </div>
         </div>
@@ -779,15 +831,20 @@
 
   <script>
     const SUPPORTED = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif", "tif", "tiff"]);
+    const CACHE_PREFIX = "gemma-photo-story:v1:";
+    const GEOCODE_CACHE_VERSION = "nominatim-place-v1";
+    const DESCRIPTION_CACHE_VERSION = "gemma-photo-description-v1";
+    const NARRATIVE_CACHE_VERSION = "gemma-photo-narrative-v1";
     const state = {
       files: [],
       objectUrls: [],
       sessionId: null,
       story: "",
       model: "gemma4:26b",
+      storyWords: 650,
       polling: false,
-      uploadedFiles: new Map(),
-      previewUrls: new Map(),
+      photoRecords: new Map(),
+      narrativeCacheKey: null,
       syncPromise: Promise.resolve(),
       selectionVersion: 0
     };
@@ -810,8 +867,119 @@
       storyContent: $("#storyContent"),
       evidenceList: $("#evidenceList"),
       modelBadge: $("#modelBadge"),
-      modelReadout: $("#modelReadout")
+      modelReadout: $("#modelReadout"),
+      cacheSummary: $("#cacheSummary")
     };
+
+    function isPlainObject(value) {
+      return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+    }
+
+    function cacheRead(key, validator) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw === null) return null;
+        const entry = JSON.parse(raw);
+        if (!isPlainObject(entry) || !validator(entry.value)) {
+          localStorage.removeItem(key);
+          return null;
+        }
+        return entry.value;
+      } catch {
+        try { localStorage.removeItem(key); } catch { /* storage may be unavailable */ }
+        return null;
+      }
+    }
+
+    function cacheWrite(key, value) {
+      const serialized = JSON.stringify({ savedAt: new Date().toISOString(), value });
+      try {
+        localStorage.setItem(key, serialized);
+      } catch {
+        try {
+          const entries = [];
+          for (let index = 0; index < localStorage.length; index += 1) {
+            const candidate = localStorage.key(index);
+            if (!candidate?.startsWith(CACHE_PREFIX)) continue;
+            const savedAt = JSON.parse(localStorage.getItem(candidate) || "{}").savedAt || "";
+            entries.push([candidate, savedAt]);
+          }
+          entries.sort((first, second) => first[1].localeCompare(second[1]));
+          entries.slice(0, Math.max(1, Math.ceil(entries.length / 5))).forEach(([candidate]) => localStorage.removeItem(candidate));
+          localStorage.setItem(key, serialized);
+        } catch {
+          elements.cacheSummary.textContent = "Saved-result cache is unavailable in this browser.";
+        }
+      }
+    }
+
+    function clearSavedResults() {
+      try {
+        const keys = [];
+        for (let index = 0; index < localStorage.length; index += 1) {
+          const key = localStorage.key(index);
+          if (key?.startsWith(CACHE_PREFIX)) keys.push(key);
+        }
+        keys.forEach((key) => localStorage.removeItem(key));
+        updateCacheSummary();
+      } catch {
+        elements.cacheSummary.textContent = "Saved-result cache is unavailable in this browser.";
+      }
+    }
+
+    async function sha256(value) {
+      const digest = await crypto.subtle.digest("SHA-256", value);
+      return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    }
+
+    async function fingerprintFile(file) {
+      if (!crypto.subtle) return `metadata-${fileKey(file)}`;
+      return sha256(await file.arrayBuffer());
+    }
+
+    function placeCacheKey(metadata) {
+      if (!Number.isFinite(metadata?.latitude) || !Number.isFinite(metadata?.longitude)) return null;
+      return `${CACHE_PREFIX}place:${GEOCODE_CACHE_VERSION}:${metadata.latitude.toFixed(7)},${metadata.longitude.toFixed(7)}`;
+    }
+
+    function descriptionCacheKey(record) {
+      const locationContext = placeCacheKey(record.metadata) || "no-gps";
+      return `${CACHE_PREFIX}description:${DESCRIPTION_CACHE_VERSION}:${state.model}:${record.fingerprint}:${locationContext}`;
+    }
+
+    async function narrativeCacheKey(records) {
+      const evidenceIdentity = records.map((record) => ({
+        fingerprint: record.fingerprint,
+        capturedAt: record.metadata?.captured_at || null,
+        placeKey: placeCacheKey(record.metadata),
+        descriptionKey: descriptionCacheKey(record)
+      }));
+      const encoded = new TextEncoder().encode(JSON.stringify({
+        version: NARRATIVE_CACHE_VERSION,
+        model: state.model,
+        storyWords: state.storyWords,
+        evidenceIdentity
+      }));
+      return `${CACHE_PREFIX}narrative:${await sha256(encoded)}`;
+    }
+
+    function selectedRecords() {
+      return state.files.map((file) => state.photoRecords.get(fileKey(file))).filter(Boolean);
+    }
+
+    function updateCacheSummary() {
+      const records = selectedRecords();
+      if (!records.length) {
+        elements.cacheSummary.textContent = "Saved results are checked after local previews are ready.";
+        return;
+      }
+      const places = records.filter((record) => {
+        const key = placeCacheKey(record.metadata);
+        return key && cacheRead(key, isPlainObject);
+      }).length;
+      const descriptions = records.filter((record) => cacheRead(descriptionCacheKey(record), isPlainObject)).length;
+      elements.cacheSummary.textContent = `Browser cache ready: ${places} place${places === 1 ? "" : "s"} · ${descriptions} description${descriptions === 1 ? "" : "s"}.`;
+    }
 
     function isSupported(file) {
       const extension = file.name.split(".").pop().toLowerCase();
@@ -861,7 +1029,7 @@
         frame.className = "photo-frame is-preparing";
         const image = document.createElement("img");
         const key = fileKey(file);
-        const serverPreview = state.previewUrls.get(key);
+        const serverPreview = state.photoRecords.get(key)?.previewUrl;
         image.alt = `Selected photograph ${index + 1}: ${file.name}`;
         image.loading = "lazy";
         image.addEventListener("load", () => frame.classList.remove("is-preparing"));
@@ -890,6 +1058,7 @@
       elements.photoCount.textContent = `${count} ${count === 1 ? "photograph" : "photographs"}`;
       elements.contactSheet.classList.toggle("is-visible", count > 0);
       elements.createStory.disabled = count === 0;
+      updateCacheSummary();
     }
 
     function queueSelectionSync() {
@@ -914,7 +1083,9 @@
       for (const file of state.files) {
         if (version !== state.selectionVersion) return;
         const key = fileKey(file);
-        if (state.uploadedFiles.has(key)) continue;
+        if (state.photoRecords.has(key)) continue;
+        const fingerprint = await fingerprintFile(file);
+        if (version !== state.selectionVersion) return;
         const uploaded = await fetchJson(
           `/api/sessions/${state.sessionId}/files?name=${encodeURIComponent(file.name)}`,
           {
@@ -925,8 +1096,12 @@
         );
         const stillSelected = state.files.some((candidate) => fileKey(candidate) === key);
         if (!stillSelected) return;
-        state.uploadedFiles.set(key, uploaded.file_name);
-        state.previewUrls.set(key, uploaded.preview_url);
+        state.photoRecords.set(key, {
+          fileName: uploaded.file_name,
+          previewUrl: uploaded.preview_url,
+          metadata: uploaded.metadata,
+          fingerprint
+        });
         renderPhotos();
         if (version !== state.selectionVersion) return;
       }
@@ -982,6 +1157,59 @@
       return result;
     }
 
+    function chronologicalRecords() {
+      return selectedRecords().sort((first, second) => {
+        const firstDate = first.metadata?.captured_at;
+        const secondDate = second.metadata?.captured_at;
+        if (firstDate && !secondDate) return -1;
+        if (!firstDate && secondDate) return 1;
+        return (firstDate || "").localeCompare(secondDate || "") || first.fileName.localeCompare(second.fileName);
+      });
+    }
+
+    async function buildCachedPayload() {
+      const records = chronologicalRecords();
+      const cachedPlaces = {};
+      const cachedVisuals = {};
+      let allPlacesReady = true;
+      let allDescriptionsReady = true;
+      records.forEach((record) => {
+        const placeKey = placeCacheKey(record.metadata);
+        if (placeKey) {
+          const place = cacheRead(placeKey, isPlainObject);
+          if (place) cachedPlaces[record.fileName] = place;
+          else allPlacesReady = false;
+        }
+        const visual = cacheRead(descriptionCacheKey(record), isPlainObject);
+        if (visual) cachedVisuals[record.fileName] = visual;
+        else allDescriptionsReady = false;
+      });
+      state.narrativeCacheKey = await narrativeCacheKey(records);
+      const cachedStory = allPlacesReady && allDescriptionsReady
+        ? cacheRead(state.narrativeCacheKey, (value) => typeof value === "string" && Boolean(value.trim()))
+        : null;
+      return {
+        cached_places: cachedPlaces,
+        cached_visuals: cachedVisuals,
+        cached_story: cachedStory
+      };
+    }
+
+    function cacheCompletedResults(analysis, story) {
+      const recordsByName = new Map(selectedRecords().map((record) => [record.fileName, record]));
+      analysis.forEach((item) => {
+        const record = recordsByName.get(item.metadata?.file_name);
+        if (!record) return;
+        const placeKey = placeCacheKey(record.metadata);
+        if (placeKey && isPlainObject(item.place)) cacheWrite(placeKey, item.place);
+        if (isPlainObject(item.visual)) cacheWrite(descriptionCacheKey(record), item.visual);
+      });
+      if (state.narrativeCacheKey && analysis.length === recordsByName.size && story?.trim()) {
+        cacheWrite(state.narrativeCacheKey, story);
+      }
+      updateCacheSummary();
+    }
+
     async function createStory() {
       if (!state.files.length) return;
       hideError();
@@ -992,12 +1220,19 @@
       elements.progressPanel.scrollIntoView({ behavior: "smooth", block: "start" });
       try {
         await state.syncPromise;
-        if (!state.sessionId || state.uploadedFiles.size !== state.files.length) {
+        if (!state.sessionId || state.photoRecords.size !== state.files.length) {
           throw new Error("The local photo preparation did not finish.");
         }
         history.replaceState(null, "", `?session=${state.sessionId}`);
-        setProgress(0.2, "Reading timestamps and GPS metadata locally…");
-        await fetchJson(`/api/sessions/${state.sessionId}/process`, { method: "POST" });
+        setProgress(0.12, "Checking saved results in this browser…");
+        const cached = await buildCachedPayload();
+        const hitCount = Object.keys(cached.cached_places).length + Object.keys(cached.cached_visuals).length + Number(Boolean(cached.cached_story));
+        setProgress(0.2, hitCount ? `Reusing ${hitCount} saved result${hitCount === 1 ? "" : "s"}; reading anything new…` : "Reading timestamps and GPS metadata locally…");
+        await fetchJson(`/api/sessions/${state.sessionId}/process`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(cached)
+        });
         state.polling = true;
         await pollSession();
       } catch (error) {
@@ -1007,6 +1242,9 @@
 
     function progressFromLogs(logs, total) {
       const described = logs.filter((line) => line.includes("Image description from")).length;
+      if (logs.some((line) => line.includes("Using browser-cached narrative"))) {
+        return [0.98, "Restoring the saved narrative…"];
+      }
       if (logs.some((line) => line.includes("Writing narrative with model"))) {
         return [0.93, `Gemma ${state.model} is weaving the narrative…`];
       }
@@ -1031,7 +1269,8 @@
             state.polling = false;
             state.story = session.story;
             setProgress(1, "The story is ready.");
-            renderStory(session.story, session.analysis || []);
+            cacheCompletedResults(session.analysis || [], session.story);
+            renderStory(session.story, session.analysis || [], session.photos || []);
             return;
           }
           if (session.status === "error") {
@@ -1091,8 +1330,50 @@
       return place.named_place?.name || place.name || place.city || place.locality || place.label || "Nearby mapped place";
     }
 
-    function renderStory(story, analysis) {
+    function addInlineStoryPhotos(analysis, photos) {
+      const photoByName = new Map(photos.map((photo) => [photo.file_name, photo]));
+      const firstDivider = elements.storyContent.querySelector("hr");
+      const paragraphs = Array.from(elements.storyContent.querySelectorAll("p"))
+        .filter((paragraph) => !firstDivider || Boolean(paragraph.compareDocumentPosition(firstDivider) & Node.DOCUMENT_POSITION_FOLLOWING));
+      const insertedAfter = new Map();
+      analysis.forEach((item, index) => {
+        const fileName = item.metadata?.file_name;
+        const photo = photoByName.get(fileName);
+        if (!photo?.preview_url) return;
+        const figure = document.createElement("figure");
+        figure.className = "story-photo";
+        const image = document.createElement("img");
+        const description = item.visual?.concise_description || `Vacation photograph ${index + 1}`;
+        image.src = photo.preview_url;
+        image.alt = description;
+        const caption = document.createElement("figcaption");
+        const place = document.createElement("span");
+        place.className = "story-photo-place";
+        place.textContent = bestPlace(item.place);
+        const name = document.createElement("span");
+        name.textContent = fileName || `Photograph ${index + 1}`;
+        caption.append(place, name);
+        figure.append(image, caption);
+
+        if (!paragraphs.length) {
+          if (firstDivider) firstDivider.before(figure);
+          else elements.storyContent.append(figure);
+          return;
+        }
+        const paragraphIndex = Math.min(
+          paragraphs.length - 1,
+          Math.floor(((index + 1) * paragraphs.length) / analysis.length) - 1
+        );
+        const target = paragraphs[Math.max(0, paragraphIndex)];
+        const insertionPoint = insertedAfter.get(target) || target;
+        insertionPoint.after(figure);
+        insertedAfter.set(target, figure);
+      });
+    }
+
+    function renderStory(story, analysis, photos = []) {
       elements.storyContent.innerHTML = renderMarkdown(story);
+      addInlineStoryPhotos(analysis, photos);
       elements.evidenceList.replaceChildren();
       analysis.forEach((item) => {
         const row = document.createElement("li");
@@ -1146,8 +1427,8 @@
       state.files = [];
       state.sessionId = null;
       state.story = "";
-      state.uploadedFiles.clear();
-      state.previewUrls.clear();
+      state.photoRecords.clear();
+      state.narrativeCacheKey = null;
       state.syncPromise = Promise.resolve();
       renderPhotos();
       elements.progressPanel.classList.remove("is-visible");
@@ -1172,6 +1453,7 @@
       try {
         const config = await fetchJson("/api/config");
         state.model = config.model;
+        state.storyWords = config.story_words;
         elements.modelBadge.textContent = `Model: ${state.model}`;
         elements.modelReadout.textContent = `Local model / ${state.model}`;
         await resumeSessionFromUrl();
@@ -1202,6 +1484,7 @@
       event.target.value = "";
     });
     $("#clearPhotos").addEventListener("click", resetApp);
+    $("#clearCache").addEventListener("click", clearSavedResults);
     elements.createStory.addEventListener("click", createStory);
     $("#copyStory").addEventListener("click", copyStory);
     $("#saveStory").addEventListener("click", saveStory);

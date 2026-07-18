@@ -7,7 +7,7 @@ import threading
 import urllib.parse
 import uuid
 import webbrowser
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -19,6 +19,7 @@ from .cli import (
     IMAGE_EXTENSIONS,
     StoryError,
     check_prerequisites,
+    extract_metadata,
     prepare_jpeg,
     run,
 )
@@ -26,6 +27,7 @@ from .cli import (
 
 DEFAULT_PORT = 8765
 MAX_FILE_BYTES = 100 * 1024 * 1024
+MAX_PROCESS_BODY_BYTES = 2 * 1024 * 1024
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 INDEX_PATH = Path(__file__).with_name("web").joinpath("index.html")
 
@@ -69,6 +71,42 @@ def sanitize_upload_name(value: str) -> str:
     return base_name
 
 
+def validate_cached_results(
+    value: Any,
+    allowed_file_names: set[str],
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]], str | None]:
+    if value is None:
+        value = {}
+    if not isinstance(value, dict):
+        raise StoryError("Cached processing data must be a JSON object")
+
+    def validated_map(field_name: str) -> dict[str, dict[str, Any]]:
+        candidate = value.get(field_name, {})
+        if not isinstance(candidate, dict):
+            raise StoryError(f"{field_name} must be a JSON object")
+        result: dict[str, dict[str, Any]] = {}
+        for file_name, cached_value in candidate.items():
+            if file_name not in allowed_file_names:
+                raise StoryError(f"Cached result references an unknown photo: {file_name}")
+            if not isinstance(cached_value, dict):
+                raise StoryError(f"Cached result for {file_name} must be a JSON object")
+            result[file_name] = cached_value
+        return result
+
+    cached_story = value.get("cached_story")
+    if cached_story is not None:
+        if not isinstance(cached_story, str) or not cached_story.strip():
+            raise StoryError("cached_story must be a non-empty string")
+        if len(cached_story) > 100_000:
+            raise StoryError("cached_story is too large")
+
+    return (
+        validated_map("cached_places"),
+        validated_map("cached_visuals"),
+        cached_story,
+    )
+
+
 @dataclass
 class SessionState:
     identifier: str
@@ -79,6 +117,8 @@ class SessionState:
     analysis: list[dict[str, Any]] | None = None
     story: str | None = None
     error: str | None = None
+    photos: list[dict[str, Any]] = field(default_factory=list)
+    cache_hits: dict[str, int] = field(default_factory=dict)
     lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     @property
@@ -108,6 +148,8 @@ class SessionState:
                 "analysis": self.analysis,
                 "story": self.story,
                 "error": self.error,
+                "photos": list(self.photos),
+                "cache_hits": dict(self.cache_hits),
             }
 
 
@@ -155,22 +197,45 @@ class StoryHTTPServer(ThreadingHTTPServer):
         with self.sessions_lock:
             return self.sessions.get(identifier)
 
-    def start_session(self, session: SessionState) -> None:
+    def start_session(
+        self,
+        session: SessionState,
+        *,
+        cached_places: dict[str, dict[str, Any]],
+        cached_visuals: dict[str, dict[str, Any]],
+        cached_story: str | None,
+    ) -> None:
         with session.lock:
             if session.status != "selecting":
                 raise StoryError("This photo session has already started")
             if not any(session.photos_dir.iterdir()):
                 raise StoryError("Drop at least one supported photo before starting")
             session.status = "running"
+            session.cache_hits = {
+                "places": len(cached_places),
+                "descriptions": len(cached_visuals),
+                "narrative": int(cached_story is not None),
+            }
             session.logs.append(f"Starting local analysis with model {self.model}")
+            session.logs.append(
+                "Browser cache hits: "
+                f"{len(cached_places)} places, {len(cached_visuals)} descriptions, "
+                f"{int(cached_story is not None)} narrative"
+            )
         threading.Thread(
             target=self._process_session,
-            args=(session,),
+            args=(session, cached_places, cached_visuals, cached_story),
             daemon=True,
             name=f"photo-story-{session.identifier[:8]}",
         ).start()
 
-    def _process_session(self, session: SessionState) -> None:
+    def _process_session(
+        self,
+        session: SessionState,
+        cached_places: dict[str, dict[str, Any]],
+        cached_visuals: dict[str, dict[str, Any]],
+        cached_story: str | None,
+    ) -> None:
         args = argparse.Namespace(
             images=session.photos_dir,
             output_dir=session.output_dir,
@@ -180,7 +245,13 @@ class StoryHTTPServer(ThreadingHTTPServer):
             story_words=self.story_words,
         )
         try:
-            analysis_path, story_path = run(args, logger=session.add_log)
+            analysis_path, story_path = run(
+                args,
+                logger=session.add_log,
+                cached_places=cached_places,
+                cached_visuals=cached_visuals,
+                cached_story=cached_story,
+            )
             analysis = json.loads(analysis_path.read_text(encoding="utf-8"))
             story = story_path.read_text(encoding="utf-8")
             with session.lock:
@@ -216,6 +287,7 @@ class StoryRequestHandler(BaseHTTPRequestHandler):
             self._send_json(
                 {
                     "model": self.server.model,
+                    "story_words": self.server.story_words,
                     "privacy": (
                         "Photos stay on this Mac. Only GPS coordinates are sent "
                         "to OpenStreetMap Nominatim."
@@ -274,7 +346,21 @@ class StoryRequestHandler(BaseHTTPRequestHandler):
                 self._send_error(HTTPStatus.NOT_FOUND, "Photo session not found")
                 return
             try:
-                self.server.start_session(session)
+                process_payload = self._read_json_body()
+                with session.lock:
+                    allowed_file_names = {
+                        photo["file_name"] for photo in session.photos
+                    }
+                cached_places, cached_visuals, cached_story = validate_cached_results(
+                    process_payload,
+                    allowed_file_names,
+                )
+                self.server.start_session(
+                    session,
+                    cached_places=cached_places,
+                    cached_visuals=cached_visuals,
+                    cached_story=cached_story,
+                )
             except StoryError as exc:
                 self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
                 return
@@ -333,7 +419,8 @@ class StoryRequestHandler(BaseHTTPRequestHandler):
             preview_path = session.previews_dir / preview_name
             try:
                 prepare_jpeg(target, preview_path, 640)
-            except StoryError as exc:
+                metadata = extract_metadata([target])[0]
+            except (StoryError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
                 target.unlink(missing_ok=True)
                 preview_path.unlink(missing_ok=True)
                 self._send_error(
@@ -341,14 +428,23 @@ class StoryRequestHandler(BaseHTTPRequestHandler):
                     f"Could not prepare a local preview for {target.name}: {exc}",
                 )
                 return
+            preview_url = (
+                f"/api/sessions/{session.identifier}/previews/"
+                f"{urllib.parse.quote(preview_name, safe='')}"
+            )
+            session.photos.append(
+                {
+                    "file_name": target.name,
+                    "preview_url": preview_url,
+                    "metadata": asdict(metadata),
+                }
+            )
         self._send_json(
             {
                 "file_name": target.name,
                 "bytes": content_length,
-                "preview_url": (
-                    f"/api/sessions/{session.identifier}/previews/"
-                    f"{urllib.parse.quote(preview_name, safe='')}"
-                ),
+                "preview_url": preview_url,
+                "metadata": asdict(metadata),
             },
             status=HTTPStatus.CREATED,
         )
@@ -366,6 +462,29 @@ class StoryRequestHandler(BaseHTTPRequestHandler):
         if length > MAX_FILE_BYTES:
             raise StoryError("Each photo must be 100 MB or smaller")
         return length
+
+    def _read_json_body(self) -> dict[str, Any]:
+        value = self.headers.get("Content-Length")
+        if value is None:
+            return {}
+        try:
+            length = int(value)
+        except ValueError as exc:
+            raise StoryError("Processing request size was not valid") from exc
+        if length == 0:
+            return {}
+        if length < 0 or length > MAX_PROCESS_BODY_BYTES:
+            raise StoryError("Cached processing data is too large")
+        content = self.rfile.read(length)
+        if len(content) != length:
+            raise StoryError("Cached processing data ended before all bytes arrived")
+        try:
+            result = json.loads(content)
+        except json.JSONDecodeError as exc:
+            raise StoryError("Cached processing data was not valid JSON") from exc
+        if not isinstance(result, dict):
+            raise StoryError("Cached processing data must be a JSON object")
+        return result
 
     @staticmethod
     def _unique_target(folder: Path, name: str) -> Path:

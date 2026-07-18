@@ -14,7 +14,6 @@ import urllib.parse
 import urllib.request
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -696,10 +695,21 @@ Evidence:
     )
 
 
-def check_prerequisites(ollama_url: str, model: str) -> None:
-    missing = [name for name in ("exiftool", "sips") if shutil.which(name) is None]
+def check_prerequisites(
+    ollama_url: str,
+    model: str,
+    *,
+    require_ollama: bool = True,
+    require_sips: bool = True,
+) -> None:
+    commands = ["exiftool"]
+    if require_sips:
+        commands.append("sips")
+    missing = [name for name in commands if shutil.which(name) is None]
     if missing:
         raise StoryError(f"Missing required commands: {', '.join(missing)}")
+    if not require_ollama:
+        return
     result = direct_json_request(
         f"{ollama_url.rstrip('/')}/api/tags",
         purpose="ollama",
@@ -735,9 +745,20 @@ def run(
     args: argparse.Namespace,
     *,
     logger: Callable[[str], None] = console_log,
+    cached_places: dict[str, dict[str, Any]] | None = None,
+    cached_visuals: dict[str, dict[str, Any]] | None = None,
+    cached_story: str | None = None,
 ) -> tuple[Path, Path]:
-    check_prerequisites(args.ollama_url, args.model)
+    cached_places = cached_places or {}
+    cached_visuals = cached_visuals or {}
     images = discover_images(args.images)
+    missing_visuals = any(path.name not in cached_visuals for path in images)
+    check_prerequisites(
+        args.ollama_url,
+        args.model,
+        require_ollama=missing_visuals or not cached_story,
+        require_sips=missing_visuals,
+    )
     metadata = extract_metadata(images)
     output_dir = args.output_dir.expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -749,8 +770,15 @@ def run(
         for index, item in enumerate(metadata, start=1):
             place = None
             if item.latitude is not None and item.longitude is not None:
-                logger(f"[{index}/{len(metadata)}] Reverse-geocoding GPS")
-                place = geocoder.reverse(item.latitude, item.longitude)
+                if item.file_name in cached_places:
+                    logger(
+                        f"[{index}/{len(metadata)}] Using browser-cached reverse "
+                        f"geocode for {item.file_name}"
+                    )
+                    place = cached_places[item.file_name]
+                else:
+                    logger(f"[{index}/{len(metadata)}] Reverse-geocoding GPS")
+                    place = geocoder.reverse(item.latitude, item.longitude)
                 print_json_log(
                     f"[{index}/{len(metadata)}] Reverse-geocode result",
                     place,
@@ -760,19 +788,26 @@ def run(
                 logger(
                     f"[{index}/{len(metadata)}] Reverse-geocode skipped: no GPS metadata"
                 )
-            logger(
-                f"[{index}/{len(metadata)}] Describing {item.file_name} "
-                f"with model {args.model}"
-            )
-            jpeg_path = temp_dir / f"{index:04d}-{Path(item.file_name).stem}.jpg"
-            prepare_jpeg(Path(item.source_path), jpeg_path, args.max_image_dimension)
-            visual = describe_image(
-                jpeg_path,
-                metadata=item,
-                place=place,
-                ollama_url=args.ollama_url,
-                model=args.model,
-            )
+            if item.file_name in cached_visuals:
+                logger(
+                    f"[{index}/{len(metadata)}] Using browser-cached image "
+                    f"description from {args.model} for {item.file_name}"
+                )
+                visual = cached_visuals[item.file_name]
+            else:
+                logger(
+                    f"[{index}/{len(metadata)}] Describing {item.file_name} "
+                    f"with model {args.model}"
+                )
+                jpeg_path = temp_dir / f"{index:04d}-{Path(item.file_name).stem}.jpg"
+                prepare_jpeg(Path(item.source_path), jpeg_path, args.max_image_dimension)
+                visual = describe_image(
+                    jpeg_path,
+                    metadata=item,
+                    place=place,
+                    ollama_url=args.ollama_url,
+                    model=args.model,
+                )
             print_json_log(
                 f"[{index}/{len(metadata)}] Image description from {args.model}",
                 visual,
@@ -786,13 +821,17 @@ def run(
         + "\n",
         encoding="utf-8",
     )
-    logger(f"Writing narrative with model {args.model}")
-    story = write_story(
-        analyses,
-        ollama_url=args.ollama_url,
-        model=args.model,
-        target_words=args.story_words,
-    )
+    if cached_story:
+        logger(f"Using browser-cached narrative from model {args.model}")
+        story = cached_story
+    else:
+        logger(f"Writing narrative with model {args.model}")
+        story = write_story(
+            analyses,
+            ollama_url=args.ollama_url,
+            model=args.model,
+            target_words=args.story_words,
+        )
     story_path = output_dir / "story.md"
     story_path.write_text(story.rstrip() + "\n", encoding="utf-8")
     return analysis_path, story_path

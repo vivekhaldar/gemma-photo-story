@@ -46,8 +46,17 @@ uv run gemma-photo-story-web
 Then drag a folder or a set of photos onto the page. The app shows local
 JPEG thumbnails generated locally with `sips` (including for HEIC originals),
 local progress, the resolved place and Gemma description for each image, and
-the finished narrative with copy and Markdown-download controls. Each original
-is transferred to the loopback server once and reused for Gemma analysis.
+the finished narrative with its photographs placed inline, plus copy and
+Markdown-download controls. Each original is transferred to the loopback
+server once and reused for Gemma analysis.
+
+The page caches small JSON results in browser `localStorage`: reverse-geocodes
+are keyed by GPS coordinates, descriptions by photo SHA-256, model, location
+context, and prompt version, and narratives by the ordered photo set, model,
+target length, and prompt version. A repeated selection therefore reuses saved
+place names, descriptions, and narrative instead of calling Nominatim or
+running Gemma inference again. Photo bytes and thumbnail data are never stored
+in `localStorage`. Use **Clear saved results** on the page to remove this cache.
 
 Normal browser security does not reveal absolute paths for dropped files. The
 page therefore transfers the selected bytes to the Python server over
@@ -55,6 +64,8 @@ page therefore transfers the selected bytes to the Python server over
 stops. This is local loopback traffic, not an Internet upload. The server
 accepts only loopback `Host` headers, applies a restrictive content security
 policy, and sends only GPS coordinates to Nominatim.
+Cached place names and generated text remain in that browser profile until
+cleared; they can be sensitive in the same way as the generated story.
 
 Use a different port or prevent the automatic browser launch if needed:
 
